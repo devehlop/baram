@@ -1,0 +1,62 @@
+import { Composer } from 'grammy';
+import { t } from '../../i18n.js';
+import type { MyContext } from '../context.js';
+import { enter } from '../enter.js';
+import { answerCb, send } from '../tg.js';
+import { menuKeyOf, showMenu, type MenuKey } from '../ui/menu.js';
+import { admin, adminMenu } from './admin.js';
+import { becomeDriver, driver, driverData, driverTrips, postTripMenu, toDriverMenu, toPassengerMenu } from './driver.js';
+import { findTrip, help, myTrips, passenger } from './passenger.js';
+import { requests, requestsList } from './requests.js';
+
+export const handlers = new Composer<MyContext>();
+
+handlers.command('id', async (ctx) => {
+  await send(ctx.chat.id, t('your-id', { id: String(ctx.from?.id ?? '') }));
+});
+
+// Всё остальное доступно только после регистрации.
+handlers.use(async (ctx, next) => {
+  if (ctx.user) return next();
+  if (ctx.callbackQuery) await answerCb(ctx.callbackQuery.id);
+  await enter(ctx, 'registration');
+});
+
+handlers.command(['start', 'menu', 'cancel'], async (ctx) => {
+  await showMenu(ctx.user!);
+});
+handlers.command('help', help);
+handlers.command('admin', adminMenu);
+
+/** Большие кнопки главного меню приходят обычным текстом. */
+const MENU: Record<MenuKey, (ctx: MyContext) => Promise<void>> = {
+  'menu-find': findTrip,
+  'menu-my-trips': myTrips,
+  'menu-help': help,
+  'menu-become-driver': becomeDriver,
+  'menu-to-driver': toDriverMenu,
+  'menu-post-trip': postTripMenu,
+  'menu-driver-trips': driverTrips,
+  'menu-requests': requestsList,
+  'menu-driver-data': driverData,
+  'menu-to-passenger': toPassengerMenu,
+  'menu-admin': adminMenu,
+};
+
+handlers.on('message:text', async (ctx, next) => {
+  const key = menuKeyOf(ctx.message.text);
+  if (!key) return next();
+  await MENU[key](ctx);
+});
+
+handlers.use(driver, passenger, requests, admin);
+
+handlers.callbackQuery('noop', (ctx) => ctx.answerCallbackQuery());
+
+handlers.on('callback_query', async (ctx) => {
+  await answerCb(ctx.callbackQuery.id, t('stale-button'));
+});
+
+handlers.on('message', async (ctx) => {
+  await showMenu(ctx.user!, t('fallback'));
+});
