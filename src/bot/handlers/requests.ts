@@ -36,6 +36,7 @@ requests.callbackQuery('r:skip', async (ctx) => {
 requests.callbackQuery(/^r:take:(\d+)$/, async (ctx) => {
   const d = await requireDriver(ctx);
   if (!d) return;
+  if (d.status !== 'approved') return toast(ctx, t(`drv-cannot-post-${d.status}`), true);
   const r = await getRequest(num(ctx));
   if (!r || r.status !== 'open') return toast(ctx, t('req-gone'), true);
   const trips = await tripsForRequest(d.userId, r);
@@ -57,6 +58,9 @@ requests.callbackQuery(/^r:take:(\d+)$/, async (ctx) => {
 });
 
 requests.callbackQuery(/^r:t:(\d+):(\d+)$/, async (ctx) => {
+  const d = await requireDriver(ctx);
+  if (!d) return;
+  if (d.status !== 'approved') return toast(ctx, t(`drv-cannot-post-${d.status}`), true);
   const res = await takeRequestAction(num(ctx, 1), ctx.user!.id, num(ctx, 2));
   if (!res.ok) return toast(ctx, t(res.reason === 'gone' ? 'req-gone' : 'req-take-failed'), true);
   await show(

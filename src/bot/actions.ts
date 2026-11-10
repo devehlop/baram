@@ -102,10 +102,18 @@ export async function cancelTripAction(tripId: number, by: { driverId: number } 
   return true;
 }
 
+/** Брони, которые водитель не успел принять: при выезде и закрытии рейса им приходит отказ, а не тишина. */
+async function declineLeftovers(trip: TripView, leftovers: BookingView[]): Promise<void> {
+  for (const b of leftovers) await tellRiders(b, t('bk-declined', { when: fmtDateTime(trip.departsAt) }));
+}
+
 export async function departAction(tripId: number, driverId: number): Promise<boolean> {
+  const leftovers = await listTripBookings(tripId, ['pending', 'pending_admin']);
   if (!(await setTripDeparted(tripId, driverId))) return false;
   const trip = (await getTrip(tripId))!;
+  await declineLeftovers(trip, leftovers);
   for (const b of await listTripBookings(tripId, ['accepted', 'confirmed'])) {
+    if (b.source === 'phone') continue;
     await tellRiders(b, t('ride-driver-departed', { driver: esc(trip.driver.name), phone: fmtPhone(trip.driver.phone) }));
   }
   await refreshChannel(trip);
@@ -113,9 +121,11 @@ export async function departAction(tripId: number, driverId: number): Promise<bo
 }
 
 export async function completeTripAction(tripId: number, driverId: number | null): Promise<boolean> {
+  const leftovers = await listTripBookings(tripId, ['pending', 'pending_admin']);
   const ids = await completeTrip(tripId, driverId);
   if (!ids) return false;
   const trip = (await getTrip(tripId))!;
+  await declineLeftovers(trip, leftovers);
   for (const b of await getBookings(ids)) {
     if (b.source === 'phone') continue;
     await notifyUser(
@@ -395,7 +405,7 @@ export async function wrongPersonAction(bookingId: number, driverId: number): Pr
     fromUserId: driverId,
     bookingId,
     kind: 'wrong_person',
-    text: t('complaint-wrong-person-text', { name: who(x.b) }),
+    text: t('complaint-wrong-person-text', { name: x.b.passengerName ?? t('passenger-unknown') }),
   });
   await notifyUser(x.b.booker?.id, t('ride-wrong-person', { name: who(x.b), when: fmtDateTime(x.trip.departsAt) }));
   return true;

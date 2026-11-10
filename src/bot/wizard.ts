@@ -1,6 +1,6 @@
 import type { Context } from 'grammy';
 import { Keyboard } from 'grammy';
-import { normalizePhone } from '../lib/format.js';
+import { esc, normalizePhone } from '../lib/format.js';
 import { t } from '../i18n.js';
 import type { MyConversation } from './context.js';
 import { answerCb, clearKeyboard, edit, kb, send, type Markup } from './tg.js';
@@ -100,7 +100,7 @@ export class Wizard {
         await this.ext(async () => {
           await answerCb(cq.id);
           if (msgId) {
-            const picked = key === 'back' || key === 'home' ? '' : `\n\n✅ <i>${labels.get(key)}</i>`;
+            const picked = key === 'back' || key === 'home' ? '' : `\n\n✅ <i>${esc(labels.get(key))}</i>`;
             await edit(this.chatId, msgId, o.text + picked);
           }
         });

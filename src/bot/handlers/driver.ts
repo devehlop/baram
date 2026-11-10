@@ -115,7 +115,10 @@ export async function driverTrips(ctx: MyContext): Promise<void> {
   );
 }
 driver.callbackQuery('d:trips', driverTrips);
-driver.callbackQuery('d:post', postTripMenu);
+driver.callbackQuery('d:post', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await postTripMenu(ctx);
+});
 
 function passengerButton(b: BookingView, n: number): string {
   const mark = { pending: '🆕', pending_admin: '⏳', accepted: '', confirmed: '👍', picked_up: '✅' }[b.status as string] ?? '';
