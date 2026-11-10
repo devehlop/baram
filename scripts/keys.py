@@ -21,6 +21,13 @@ if '--args' in sys.argv:
     for k in missing: print(k, sorted(used[k]))
 else:
     print('MISSING:', len(missing)); [print(' ', k, sorted(used[k])) for k in missing]
+empty = sorted(p for p in dyn if not any(k.startswith(p) for k in have))
+if '--strict' in sys.argv:
+    if missing or empty:
+        print('Нет текстов для ключей:', missing, 'и для префиксов:', empty)
+        sys.exit(1)
+    print('Тексты в порядке: все ключи из кода есть в locales/ru.ftl')
+    sys.exit(0)
 print('DYNAMIC PREFIXES:', sorted(dyn))
 for p in sorted(dyn):
     print('  ', p, sorted(k for k in have if k.startswith(p)))

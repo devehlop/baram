@@ -16,7 +16,7 @@ async function main(): Promise<void> {
 
   await runMigrations(config.databaseUrl);
   const { db, pool } = createDb(config.databaseUrl);
-  const bot = createBot(config.botToken);
+  const bot = createBot(config.botToken, config.apiRoot ? { apiRoot: config.apiRoot } : undefined);
   initApp({ db, api: bot.api, adminIds: config.adminIds });
   await seed({ channelId: config.channelId });
   await clearConversations();

@@ -118,11 +118,13 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
 
   await w.ext(async () => {
     const me = await getUserByTg(telegramId);
-    if (!me) return;
+    // Админ может быть не зарегистрирован как пассажир: тогда действие записывается без автора.
+    const adminId = me?.id ?? null;
     const say = (msg: string, markup?: Parameters<typeof send>[2]) => send(chatId, msg, markup);
 
     switch (args.kind) {
       case 'complaint': {
+        if (!me) return;
         await fileComplaint({ fromUserId: me.id, bookingId: args.id ?? null, text });
         await say(t('complaint-sent'));
         return;
@@ -130,7 +132,7 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
       case 'phoneData': {
         const b = await getBooking(args.id);
         const trip = b && (await getTrip(b.tripId));
-        if (!b || !trip || trip.driverId !== me.id) return void (await say(t('not-found')));
+        if (!me || !b || !trip || trip.driverId !== me.id) return void (await say(t('not-found')));
         const data = a.kind === 'contact' ? { name: a.name || t('passenger-unknown'), phone: a.phone } : parseNamePhone(text);
         if (!data) return void (await say(t('phone-data-hint')));
         await setPhoneBookingData(args.id, data.name, data.phone);
@@ -142,12 +144,12 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
       }
       case 'adminReject': {
         const reason = button ? t(REJECT_REASONS[Number(button.slice(1))]!) : text;
-        await reviewDriver(args.id, me.id, 'reject', reason);
+        await reviewDriver(args.id, adminId, 'reject', reason);
         await say(t('adm-driver-rejected'));
         return;
       }
       case 'adminSuspend': {
-        await reviewDriver(args.id, me.id, 'suspend', text);
+        await reviewDriver(args.id, adminId, 'suspend', text);
         await say(t('adm-driver-suspended'), kb([[{ text: t('btn-open'), data: `a:u:${args.id}` }]]));
         return;
       }
@@ -197,7 +199,7 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
         return;
       }
       case 'adminResolve': {
-        await resolveComplaint(args.id, me.id, text);
+        await resolveComplaint(args.id, adminId, text);
         await say(t('adm-complaint-resolved'), kb([[{ text: t('adm-complaints'), data: 'a:cmp' }]]));
         return;
       }

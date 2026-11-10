@@ -1,0 +1,15 @@
+# Локальная разработка: только база. Бот запускается командой `npm run dev`.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: baram
+      POSTGRES_PASSWORD: baram
+      POSTGRES_DB: baram
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - baram-dev-db:/var/lib/postgresql/data
+
+volumes:
+  baram-dev-db:

@@ -7,6 +7,7 @@ const schema = z.object({
   APP_TZ: z.string().default('Europe/Moscow'),
   LOG_LEVEL: z.string().default('info'),
   CHANNEL_ID: z.string().default(''),
+  TELEGRAM_API_ROOT: z.string().default(''),
 });
 
 export interface Config {
@@ -16,6 +17,8 @@ export interface Config {
   tz: string;
   logLevel: string;
   channelId: string;
+  /** Свой адрес Bot API (локальный сервер Bot API или тестовая заглушка). Обычно пусто. */
+  apiRoot?: string;
 }
 
 export function parseAdminIds(raw: string): number[] {
@@ -39,5 +42,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tz: e.APP_TZ,
     logLevel: e.LOG_LEVEL,
     channelId: e.CHANNEL_ID.trim(),
+    apiRoot: e.TELEGRAM_API_ROOT.trim() || undefined,
   };
 }

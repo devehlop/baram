@@ -5,7 +5,8 @@ import type { Bot } from 'grammy';
 import { initApp } from '../src/app.js';
 import { createBot } from '../src/bot/bot.js';
 import type { MyContext } from '../src/bot/context.js';
-import type { Db } from '../src/db/client.js';
+import { createDb, type Db } from '../src/db/client.js';
+import { runMigrations } from '../src/db/migrate.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { setStrictTexts } from '../src/i18n.js';
@@ -234,9 +235,21 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
   setStrictTexts(true);
   setZone('Europe/Moscow');
   setNow(opts.now ? () => new Date(opts.now!) : null);
-  const pg = new PGlite();
-  const db = drizzle(pg, { schema }) as unknown as Db;
-  await migrate(drizzle(pg), { migrationsFolder: 'drizzle' });
+  // По умолчанию — встроенная база в памяти. С TEST_DATABASE_URL тесты идут на настоящем PostgreSQL.
+  let db: Db;
+  let closeDb: () => Promise<void>;
+  if (process.env.TEST_DATABASE_URL) {
+    const real = createDb(process.env.TEST_DATABASE_URL);
+    await real.pool.query('drop schema if exists public cascade; drop schema if exists drizzle cascade; create schema public;');
+    await runMigrations(process.env.TEST_DATABASE_URL);
+    db = real.db;
+    closeDb = () => real.pool.end();
+  } else {
+    const pg = new PGlite();
+    db = drizzle(pg, { schema }) as unknown as Db;
+    await migrate(drizzle(pg), { migrationsFolder: 'drizzle' });
+    closeDb = () => pg.close();
+  }
   const tg = new FakeTelegram();
   const bot = createBot('1:TEST', { fetch: tg.fetch });
   bot.botInfo = {
@@ -259,7 +272,7 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
     user: (id, name) => new TestUser(h, id, name),
     close: async () => {
       setNow(null);
-      await pg.close();
+      await closeDb();
     },
   };
   return h;

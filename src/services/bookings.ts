@@ -270,6 +270,7 @@ export async function createBooking(
         prepayRequired: input.baggage === 'many',
         status,
         acceptedAt: input.preAccepted ? now() : null,
+        createdAt: now(),
         pickupOrder: await nextOrder(tx, input.tripId),
       })
       .returning({ id: bookings.id });

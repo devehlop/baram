@@ -15,9 +15,13 @@ handlers.command('id', async (ctx) => {
   await send(ctx.chat.id, t('your-id', { id: String(ctx.from?.id ?? '') }));
 });
 
-// Всё остальное доступно только после регистрации.
+handlers.command('admin', adminMenu);
+
+// Всё остальное доступно только после регистрации. Исключение — кнопки админа:
+// админ задаётся по Telegram ID и может работать с уведомлениями, даже не пройдя анкету пассажира.
 handlers.use(async (ctx, next) => {
   if (ctx.user) return next();
+  if (ctx.isAdmin && ctx.callbackQuery?.data?.startsWith('a:')) return next();
   if (ctx.callbackQuery) await answerCb(ctx.callbackQuery.id);
   await enter(ctx, 'registration');
 });
@@ -26,7 +30,6 @@ handlers.command(['start', 'menu', 'cancel'], async (ctx) => {
   await showMenu(ctx.user!);
 });
 handlers.command('help', help);
-handlers.command('admin', adminMenu);
 
 /** Большие кнопки главного меню приходят обычным текстом. */
 const MENU: Record<MenuKey, (ctx: MyContext) => Promise<void>> = {

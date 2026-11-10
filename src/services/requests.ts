@@ -151,6 +151,7 @@ export async function createRequest(input: NewRequest): Promise<RequestView> {
       baggage: input.baggage,
       baggageNote: input.baggageNote ?? null,
       comment: input.comment ?? null,
+      createdAt: now(),
     })
     .returning({ id: requests.id });
   return (await getRequest(row!.id))!;

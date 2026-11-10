@@ -218,6 +218,7 @@ export async function createTrip(input: TripInput): Promise<{ trip?: TripView; p
       seatsFree: input.seats,
       trunk: input.trunk,
       price: input.price,
+      createdAt: now(),
     })
     .returning();
   return { trip: await getTrip(row!.id) };
