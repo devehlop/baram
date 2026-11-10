@@ -8,6 +8,10 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
   CHANNEL_ID: z.string().default(''),
   TELEGRAM_API_ROOT: z.string().default(''),
+  MINIAPP_URL: z.string().default(''),
+  PORT: z.string().default('8080'),
+  MINIAPP_DEV_TG_ID: z.string().default(''),
+  NODE_ENV: z.string().default(''),
 });
 
 export interface Config {
@@ -19,6 +23,11 @@ export interface Config {
   channelId: string;
   /** Свой адрес Bot API (локальный сервер Bot API или тестовая заглушка). Обычно пусто. */
   apiRoot?: string;
+  /** Публичный адрес Mini App (https://…). Пусто — Mini App выключен. */
+  miniappUrl?: string;
+  port: number;
+  /** Только вне production: открыть Mini App в браузере от имени этого Telegram ID. */
+  miniappDevTelegramId?: number;
 }
 
 export function parseAdminIds(raw: string): number[] {
@@ -43,5 +52,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     logLevel: e.LOG_LEVEL,
     channelId: e.CHANNEL_ID.trim(),
     apiRoot: e.TELEGRAM_API_ROOT.trim() || undefined,
+    miniappUrl: e.MINIAPP_URL.trim() || undefined,
+    port: Number(e.PORT) || 8080,
+    miniappDevTelegramId: e.NODE_ENV !== 'production' && Number(e.MINIAPP_DEV_TG_ID) > 0 ? Number(e.MINIAPP_DEV_TG_ID) : undefined,
   };
 }

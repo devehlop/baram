@@ -364,6 +364,7 @@ action-not-available = Это действие уже недоступно.
 prompt-cancelled = Хорошо, ничего не меняем.
 cmd-start = Главное меню
 cmd-help = Помощь и связь с диспетчером
+miniapp-button = Барам
 
 ## Водитель: выложить рейс
 

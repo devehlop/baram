@@ -32,6 +32,21 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  # HTTPS для Mini App: сертификат выпускается и продлевается сам.
+  # Включается профилем: docker compose -f docker-compose.prod.yml --profile miniapp up -d --build
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["miniapp"]
+    restart: unless-stopped
+    depends_on:
+      - bot
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${MINIAPP_DOMAIN:-localhost} --to bot:8080
+    volumes:
+      - caddy-data:/data
+
   backup:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -51,3 +66,4 @@ services:
 
 volumes:
   baram-db:
+  caddy-data:

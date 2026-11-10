@@ -22,3 +22,5 @@ jobs:
         run: npm test
       - name: Сборка
         run: npm run build
+      - name: Mini App — проверка типов и сборка
+        run: npm run miniapp:build

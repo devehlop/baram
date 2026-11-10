@@ -15,7 +15,10 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
-    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
+    "miniapp:build": "npm --prefix miniapp ci && npm --prefix miniapp run build",
+    "miniapp:dev": "npm --prefix miniapp run dev",
+    "miniapp:preview": "tsx scripts/preview.ts"
   },
   "dependencies": {
     "@fluent/bundle": "^0.19.1",

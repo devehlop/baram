@@ -6,3 +6,5 @@ dist
 backups
 tests
 docs
+miniapp/node_modules
+miniapp/dist

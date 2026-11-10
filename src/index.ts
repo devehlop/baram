@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { startApi } from './api/server.js';
 import { initApp } from './app.js';
 import { createBot } from './bot/bot.js';
 import { clearConversations } from './bot/storage.js';
@@ -29,10 +31,25 @@ async function main(): Promise<void> {
   ]);
   if (config.adminIds.length === 0) log.warn('ADMIN_IDS пуст: проверять водителей некому. Узнать свой ID — команда /id.');
 
+  // Mini App: тот же процесс отдаёт интерфейс и API. Включается адресом MINIAPP_URL.
+  let stopApi: (() => void) | undefined;
+  if (config.miniappUrl || config.miniappDevTelegramId) {
+    const staticDir = existsSync('miniapp/dist/index.html') ? 'miniapp/dist' : undefined;
+    if (!staticDir) log.warn('Mini App не собран: выполните npm run miniapp:build');
+    stopApi = startApi({ botToken: config.botToken, port: config.port, staticDir, devTelegramId: config.miniappDevTelegramId });
+  }
+  if (config.miniappUrl) {
+    // Кнопка слева от поля ввода в чате с ботом открывает Mini App.
+    await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: t('miniapp-button'), web_app: { url: config.miniappUrl } } });
+  } else {
+    await bot.api.setChatMenuButton({ menu_button: { type: 'commands' } });
+  }
+
   const stopJobs = startJobs();
   const shutdown = async (signal: string) => {
     log.info({ signal }, 'Останавливаемся');
     stopJobs();
+    stopApi?.();
     await bot.stop();
     await pool.end();
     process.exit(0);
