@@ -1,0 +1,107 @@
+/* Барам — токены стиля «Калфак и сурпан». Подключить один раз в корне Mini App. */
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Цвета */
+  --c-canvas: #F6EFE2;      /* холст · ак · шурă */
+  --c-surface: #FFFFFF;
+  --c-surface-2: #F1E7D6;
+  --c-ink: #2B1A14;         /* контур · кара · хура */
+  --c-ink-muted: #5E4A3F;
+  --c-line: #D8CBB3;
+  --c-red: #A81E2A;         /* марена · кызыл · хĕрлĕ */
+  --c-red-ink: #8A1822;
+  --c-green: #1E5E45;       /* бархат · яшел · симĕс */
+  --c-green-deep: #174A36;
+  --c-leaf: #7FB48F;
+  --c-gold: #D9A33A;        /* золото · алтын · сарă */
+  --c-gold-text: #E9C46A;
+  --c-gold-soft: #F6E3B8;
+  --c-gold-soft-ink: #5A3F0A;
+  --c-indigo: #2F4B8C;      /* индиго · зәңгәр · кăвак */
+  --c-alert: #C2410C;
+  --c-teen-bg: #FFE4D2;
+  --c-teen-ink: #8A2E0A;
+
+  /* Шрифт */
+  --font: 'Onest', system-ui, sans-serif;
+  --fs-logo: 36px;
+  --fs-h1: 32px;
+  --fs-title: 26px;
+  --fs-time: 30px;
+  --fs-price: 24px;
+  --fs-card: 19px;
+  --fs-button: 18px;
+  --fs-body: 17px;
+  --fs-small: 15px;
+  --fs-label: 13px;
+
+  /* Отступы */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  --page-x: 16px;
+
+  /* Радиусы */
+  --r-badge: 8px;
+  --r-chip: 10px;
+  --r-icon: 16px;
+  --r-button: 18px;
+  --r-card: 22px;
+  --r-tile: 24px;
+
+  /* Размеры */
+  --h-button: 60px;
+  --h-button-card: 56px;
+  --h-button-small: 44px;
+  --h-input: 48px;
+  --tap-min: 48px;
+  --h-tile: 140px;
+
+  /* Переопределение Telegram UI */
+  --tgui--bg_color: var(--c-canvas);
+  --tgui--secondary_bg_color: var(--c-surface);
+  --tgui--text_color: var(--c-ink);
+  --tgui--hint_color: var(--c-ink-muted);
+  --tgui--link_color: var(--c-indigo);
+  --tgui--button_color: var(--c-red);
+  --tgui--button_text_color: #FFFFFF;
+  --tgui--font_family: var(--font);
+
+  color-scheme: light;
+}
+
+html, body {
+  margin: 0;
+  background: var(--c-canvas);
+  color: var(--c-ink);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+}
+
+button { font-family: inherit; }
+a { color: var(--c-indigo); }
+
+/* Базовые кнопки */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  width: 100%; height: var(--h-button);
+  border: 0; border-radius: var(--r-button);
+  font-size: var(--fs-button); font-weight: 700; cursor: pointer;
+}
+.btn--primary { background: var(--c-red); color: #FFFFFF; }
+.btn--confirm { background: var(--c-green); color: #FFFFFF; }
+.btn--gold { background: var(--c-gold); color: var(--c-ink); }
+.btn--outline { background: var(--c-surface); color: var(--c-ink); border: 2px solid var(--c-line); font-weight: 600; }
+.btn--outline-green { background: var(--c-surface); color: var(--c-green); border: 2px solid var(--c-green); }
+.btn:focus-visible { outline: 3px solid var(--c-indigo); outline-offset: 2px; }
+
+/* Добавлено при вёрстке (правило DESIGN.md: не хватает — добавить токен, а не хардкод). */
+:root {
+  --c-on-green-soft: #E6EFE9;   /* вторичный текст на зелёной карточке */
+  --c-ok-soft: #E3F1E9;         /* подложка статуса «всё хорошо» */
+  --c-ok-ink: #0F5C39;
+  --r-button-card: 16px;
+  --r-button-small: 12px;
+  --r-option: 20px;
+}
