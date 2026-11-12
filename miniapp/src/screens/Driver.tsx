@@ -70,7 +70,7 @@ export function DriverHomeScreen() {
       <div className="row" style={{ paddingTop: 8 }}>
         <Avatar name={data.driver.name} large />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.15 }}>{data.driver.name}</div>
+          <div style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.15 }}>{data.driver.name}</div>
           <div className="row small muted" style={{ gap: 8 }}>
             {data.driver.badge && <Chip kind="ok">✓ Проверен</Chip>}
             <span>{me.driver?.car}</span>
@@ -92,7 +92,7 @@ export function DriverHomeScreen() {
             <div className="label-caps" style={{ color: 'var(--c-gold-soft-ink)' }}>Новая бронь</div>
             <div className="small muted">{time(trip.departsAt)} · {trip.route}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{b.passengerName} · {seats(b.seats)}</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>{b.passengerName} · {seats(b.seats)}</div>
           <div className="muted">{bookingLine(b)}</div>
           {b.passengerType !== 'adult' && !b.isSelf && <Chip kind="teen">{b.passengerType === 'teen' ? 'Подросток 14–17' : 'Ребёнок до 14'}, едет один</Chip>}
           <div className="grid2">
@@ -106,7 +106,7 @@ export function DriverHomeScreen() {
         <button type="button" className="green green--row" onClick={() => go({ name: 'driverTrip', id: nearest.id })}>
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="small green__sub">{dateTime(nearest.departsAt)}</span>
-            <span style={{ fontSize: 19, fontWeight: 700 }}>{nearest.route}</span>
+            <span style={{ fontSize: 19, fontWeight: 600 }}>{nearest.route}</span>
             <span className="small green__label" style={{ fontWeight: 600 }}>
               занято {nearest.seatsTotal - nearest.seatsFree} из {nearest.seatsTotal} мест
             </span>
@@ -142,7 +142,7 @@ export function DriverTripsScreen() {
       {data.trips.map((t) => (
         <button type="button" className="card card--row" key={t.id} onClick={() => go({ name: 'driverTrip', id: t.id })}>
           <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontSize: 17, fontWeight: 700 }}>{t.route}</span>
+            <span style={{ display: 'block', fontSize: 17, fontWeight: 600 }}>{t.route}</span>
             <span className="small muted">{dateTime(t.departsAt)} · занято {t.seatsTotal - t.seatsFree} из {t.seatsTotal}</span>
             {t.status === 'departed' && <span className="small" style={{ display: 'block', fontWeight: 600 }}>В пути</span>}
           </span>

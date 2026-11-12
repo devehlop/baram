@@ -12,12 +12,12 @@ export function Onboarding() {
     <div className="screen">
       <div className="welcome">
         <Logo size={52} wordColor="#FFFFFF" />
-        <div className="welcome__hi">Сәлам! Салам!</div>
+        <div className="welcome__hi">Сәлам · Салам</div>
         <div className="welcome__band"><TulipBand height={72} /></div>
       </div>
       <ChuvashBand height={24} />
       <div className="screen__body">
-        <h1 className="title">Попутчики Буинск ⇄ Казань</h1>
+        <h1 className="title">Поездки с попутчиками</h1>
         <p>Чтобы начать, зарегистрируйтесь в чате с ботом: имя и номер телефона. Это одна минута.</p>
         <div className="spacer" />
         <Button onClick={closeToBot}>Перейти в чат с ботом</Button>
@@ -52,9 +52,6 @@ export function Home() {
           <div className="hello__hi">Исәнмесез,</div>
           <div className="hello__name">{me.user!.name}</div>
         </div>
-        <div className="logo-square" aria-hidden="true">
-          <span style={{ color: '#FFFFFF', display: 'flex' }}><Icon name="arrow" size={28} stroke={2.6} /></span>
-        </div>
       </div>
 
       {last?.from && last.to && (
@@ -84,7 +81,7 @@ export function Home() {
         <button type="button" className="card card--row" onClick={() => go({ name: 'booking', id: next.booking.id })}>
           <Rosette size={22} color="#1E5E45" />
           <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontSize: 16, fontWeight: 700 }}>{dateTime(next.trip.departsAt)} · {next.trip.fromCity}</span>
+            <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{dateTime(next.trip.departsAt)} · {next.trip.fromCity} → {next.trip.toCity}</span>
             <span className="small muted">{next.trip.driver.name} · {next.trip.driver.car} · {STATUS[next.booking.status].toLowerCase()}</span>
           </span>
           <Icon name="chevron" />
@@ -107,7 +104,7 @@ export function MyTrips() {
     x.trip && (
       <button type="button" className="card card--row" key={x.booking.id} onClick={() => go({ name: 'booking', id: x.booking.id })}>
         <span style={{ flex: 1 }}>
-          <span style={{ display: 'block', fontSize: 17, fontWeight: 700 }}>{x.trip.route}</span>
+          <span style={{ display: 'block', fontSize: 17, fontWeight: 600 }}>{x.trip.route}</span>
           <span className="small muted">
             {dayLong(x.trip.departsAt)}, {time(x.trip.departsAt)}
             {x.booking.isSelf ? '' : ` · едет ${x.booking.passengerName}`}
@@ -134,7 +131,7 @@ export function MyTrips() {
       {!!data?.requests.length && <div className="label-caps muted">Заявки ждут водителя</div>}
       {data?.requests.map((r) => (
         <div className="card" key={r.id}>
-          <div style={{ fontSize: 17, fontWeight: 700 }}>{r.route}</div>
+          <div style={{ fontSize: 17, fontWeight: 600 }}>{r.route}</div>
           <div className="small muted">{requestWhen(r)}</div>
         </div>
       ))}

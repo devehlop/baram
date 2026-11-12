@@ -34,7 +34,7 @@
   --fs-button: 18px;
   --fs-body: 17px;
   --fs-small: 15px;
-  --fs-label: 13px;
+  --fs-label: 15px;
 
   /* Отступы */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
@@ -87,7 +87,7 @@ a { color: var(--c-indigo); }
   display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
   width: 100%; height: var(--h-button);
   border: 0; border-radius: var(--r-button);
-  font-size: var(--fs-button); font-weight: 700; cursor: pointer;
+  font-size: var(--fs-button); font-weight: 600; cursor: pointer;
 }
 .btn--primary { background: var(--c-red); color: #FFFFFF; }
 .btn--confirm { background: var(--c-green); color: #FFFFFF; }
