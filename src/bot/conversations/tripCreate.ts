@@ -12,6 +12,7 @@ import { publishTrip } from '../actions.js';
 import type { MyConversation } from '../context.js';
 import { kb, send } from '../tg.js';
 import { pickupLine, tripCard } from '../ui/cards.js';
+import { shareRows } from '../ui/share.js';
 import { column, grid, runSteps, Wizard, type Step } from '../wizard.js';
 import { dayButtons, dayOptions, nav, type DayOption } from './common.js';
 
@@ -324,10 +325,12 @@ export async function tripCreate(conv: MyConversation, ctx: Context, mode: 'new'
         t('trip-published'),
         tripCard(trip, { own: true }),
         waitingRequests > 0 ? t('trip-published-requests', { n: waitingRequests }) : '',
+        shareRows(trip).length ? t('share-hint') : '',
       ]
         .filter(Boolean)
         .join('\n\n'),
       kb([
+        ...shareRows(trip),
         [{ text: t('btn-open-trip'), data: `d:t:${trip.id}` }],
         waitingRequests > 0 ? [{ text: t('menu-requests'), data: 'r:list' }] : [],
       ]),
