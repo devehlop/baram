@@ -28,6 +28,7 @@ import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
 import { kb, type Btn } from '../tg.js';
 import { bookingForDriver, driverCard, tripCard } from '../ui/cards.js';
+import { shareRows } from '../ui/share.js';
 import { showMenu } from '../ui/menu.js';
 import { num, requireDriver, show, toast } from './shared.js';
 
@@ -134,6 +135,7 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   const active = trip.status === 'published' || trip.status === 'departed';
   const rows: (Btn | false)[][] = list.map((b, i) => [{ text: passengerButton(b, i + 1), data: `d:b:${b.id}` }]);
   if (trip.status === 'published') {
+    rows.push(...shareRows(trip));
     rows.push([{ text: t('btn-departed'), data: `d:go:${trip.id}` }]);
     if (trip.seatsFree > 0) rows.push([{ text: t('btn-phone-booking'), data: `d:ph:${trip.id}` }]);
     rows.push([{ text: t('btn-cancel-trip'), data: `d:tc:${trip.id}` }]);

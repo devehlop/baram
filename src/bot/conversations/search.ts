@@ -2,7 +2,7 @@ import type { Context } from 'grammy';
 import type { Baggage, ChildSeat, PassengerType, Side, TimeKind } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone, money, normalizePhone } from '../../lib/format.js';
-import { dayKey, fmtDateTime, parseTime } from '../../lib/time.js';
+import { dayKey, fmtDateTime, minutesOfDay, now, parseTime } from '../../lib/time.js';
 import { getBooking, type BookingView } from '../../services/bookings.js';
 import { listLocalities, type LocalityView } from '../../services/directions.js';
 import type { RequestView } from '../../services/requests.js';
@@ -54,16 +54,23 @@ interface SearchState {
   baggageNote?: string | null;
   comment?: string | null;
   trip?: TripView;
+  /** Рейс из ссылки в чате: день, время и направление уже известны, спрашиваем только про пассажира. */
+  pinned?: TripView;
   pickupPoint?: string | null;
   outcome?: { booking: BookingView; trip: TripView; needsAdmin: boolean } | { request: RequestView };
 }
 
-export interface SearchPrefill {
-  /** Повторить прошлую поездку: адреса, пассажир, места и багаж берутся из брони. */
-  bookingId: number;
-  /** «Обратно»: адреса меняются местами. */
-  reverse: boolean;
-}
+export type SearchPrefill =
+  | {
+      /** Повторить прошлую поездку: адреса, пассажир, места и багаж берутся из брони. */
+      bookingId: number;
+      /** «Обратно»: адреса меняются местами. */
+      reverse: boolean;
+    }
+  | {
+      /** Забронировать конкретный рейс — по ссылке из чата. */
+      tripId: number;
+    };
 
 const TOTAL = 7;
 const head = (n: number, question: string, note = '') =>
@@ -92,7 +99,10 @@ function reachable(s: SearchState, l: { directionId: number; side: Side }): bool
 /** Вопрос про адрес: сохранённые адреса, города, деревни; затем улица и дом текстом или геопозицией. */
 async function askPlace(w: Wizard, s: SearchState, which: 'from' | 'to'): Promise<Addr | 'back' | 'home'> {
   const isTo = which === 'to';
-  const fits = (l: { directionId: number; side: Side }) => !isTo || reachable(s, l);
+  const pin = s.pinned;
+  const fits = (l: { directionId: number; side: Side }) =>
+    (!pin || (l.directionId === pin.directionId && (isTo ? l.side !== pin.fromSide : l.side === pin.fromSide))) &&
+    (!isTo || reachable(s, l));
   for (;;) {
     const saved = s.savedAddresses.filter(fits);
     const cityNames = [...new Set(s.localities.filter((l) => l.kind === 'city' && fits(l)).map((l) => l.name))];
@@ -233,6 +243,7 @@ const steps: Step<SearchState>[] = [
   },
   {
     id: 'when',
+    when: (s) => !s.pinned,
     run: async (w, s) => {
       const d = await w.ask({ text: head(4, t('search-ask-day')), rows: grid(dayButtons(s.days), 2) });
       if (d.kind !== 'btn') return nav(d) ?? 'back';
@@ -350,12 +361,27 @@ const steps: Step<SearchState>[] = [
         excludeDriverId: s.userId,
       };
       const found = await w.ext(() => searchTrips(query));
-      const exact = found.exact.slice(0, 5);
-      const near = found.near.slice(0, exact.length ? 2 : 5);
+      let exact = found.exact.slice(0, 5);
+      let near = found.near.slice(0, exact.length ? 2 : 5);
+      let pinnedGone = false;
+      if (s.pinned) {
+        // Рейс из ссылки: показываем только его. Пока человек отвечал, рейс могли отменить или занять места.
+        const pinned = s.pinned;
+        const fresh = await w.ext(async () => {
+          const x = await getTrip(pinned.id);
+          const ok = x && x.status === 'published' && new Date(x.departsAt) > now() && x.seatsFree >= s.seats! && x.driverId !== s.userId;
+          return ok ? x : null;
+        });
+        if (fresh) {
+          exact = [fresh];
+          near = [];
+        } else pinnedGone = true;
+      }
       const shown = [...exact, ...near];
       const opts = { village: s.from!.village || s.to!.village, needChildSeat: s.childSeat === 'driver' };
       const cards = (list: TripView[]) => list.map((x) => tripCard(x, opts)).join('\n\n');
       const text = [
+        pinnedGone ? t('search-pinned-gone') : '',
         exact.length ? `${t('search-found', { n: exact.length })}\n\n${cards(exact)}` : '',
         near.length ? `${t(exact.length ? 'search-also-near' : 'search-near')}\n\n${cards(near)}` : '',
         shown.length ? t('search-pick') : t('search-none'),
@@ -445,7 +471,7 @@ const steps: Step<SearchState>[] = [
       });
       if (a.kind !== 'btn') return nav(a) ?? 'back';
       if (a.data === 'fix') {
-        const fields = ['who', 'from', 'to', 'when', 'seats', 'baggage', 'comment'];
+        const fields = ['who', 'from', 'to', 'when', 'seats', 'baggage', 'comment'].filter((f) => !(s.pinned && f === 'when'));
         const fix = await w.ask({
           text: t('ask-what-to-fix'),
           rows: grid(fields.map((f) => ({ text: t(`search-field-${f}`), data: f })), 2),
@@ -502,13 +528,24 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
       reviewed: false,
       prefilled: false,
     };
-    const b = prefill ? await getBooking(prefill.bookingId) : undefined;
-    if (b && b.booker?.id === user.id && b.from && b.to) {
+    if (prefill && 'tripId' in prefill) {
+      const trip = await getTrip(prefill.tripId);
+      if (trip && trip.status === 'published' && new Date(trip.departsAt) > now() && trip.driverId !== user.id) {
+        Object.assign(state, {
+          pinned: trip,
+          day: dayKey(trip.departsAt),
+          timeKind: 'exact',
+          exactMinutes: minutesOfDay(trip.departsAt),
+        } satisfies Partial<SearchState>);
+      }
+    }
+    const b = prefill && 'bookingId' in prefill ? await getBooking(prefill.bookingId) : undefined;
+    if (prefill && 'bookingId' in prefill && b && b.booker?.id === user.id && b.from && b.to) {
       const place = (p: NonNullable<BookingView['from']>): Addr | undefined => {
         const l = localities.find((x) => x.id === p.localityId);
         return l ? addrOf(l, p.address, p.lat, p.lon) : undefined;
       };
-      const [from, to] = prefill!.reverse ? [place(b.to), place(b.from)] : [place(b.from), place(b.to)];
+      const [from, to] = prefill.reverse ? [place(b.to), place(b.from)] : [place(b.from), place(b.to)];
       if (from && to) {
         Object.assign(state, {
           passenger: { name: b.passengerName ?? user.name, phone: b.passengerPhone ?? user.phone, type: b.passengerType, self: b.isSelf },
@@ -534,6 +571,10 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
         to: `${esc(s.to!.city)}, ${esc(s.to!.address)}`,
       }),
     );
+  }
+
+  if (s.pinned) {
+    await w.say(t('search-pinned-intro', { route: esc(s.pinned.route), when: fmtDateTime(s.pinned.departsAt) }));
   }
 
   const res = await runSteps(w, steps, s, s.prefilled ? 'when' : undefined);

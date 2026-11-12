@@ -39,6 +39,11 @@ export async function myTrips(ctx: MyContext): Promise<void> {
   await show(ctx, t(empty ? 'my-trips-empty' : 'my-trips-title'), kb(rows));
 }
 passenger.callbackQuery('p:trips', myTrips);
+// «Забронировать место» под карточкой рейса из ссылки в чате.
+passenger.callbackQuery(/^p:lb:(\d+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await enter(ctx, 'search', { tripId: num(ctx) });
+});
 passenger.callbackQuery('p:find', async (ctx) => {
   await ctx.answerCallbackQuery();
   await findTrip(ctx);

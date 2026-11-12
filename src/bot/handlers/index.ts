@@ -8,6 +8,8 @@ import { admin, adminMenu } from './admin.js';
 import { becomeDriver, driver, driverData, driverTrips, postTripMenu, toDriverMenu, toPassengerMenu } from './driver.js';
 import { findTrip, help, myTrips, passenger } from './passenger.js';
 import { requests, requestsList } from './requests.js';
+import { parseTripPayload } from '../ui/share.js';
+import { rememberTripLink, sendTripLink } from './tripLink.js';
 
 export const handlers = new Composer<MyContext>();
 
@@ -22,11 +24,16 @@ handlers.command('admin', adminMenu);
 handlers.use(async (ctx, next) => {
   if (ctx.user) return next();
   if (ctx.isAdmin && ctx.callbackQuery?.data?.startsWith('a:')) return next();
+  // Пришёл по ссылке на рейс из чата, но ещё не зарегистрирован: запомним рейс, покажем после регистрации.
+  const linked = parseTripPayload(/^\/start(?:@\w+)?\s+(\S+)/.exec(ctx.message?.text ?? '')?.[1]);
+  if (linked && ctx.from) rememberTripLink(ctx.from.id, linked);
   if (ctx.callbackQuery) await answerCb(ctx.callbackQuery.id);
   await enter(ctx, 'registration');
 });
 
 handlers.command(['start', 'menu', 'cancel'], async (ctx) => {
+  const tripId = ctx.message?.text?.startsWith('/start') ? parseTripPayload(ctx.match) : null;
+  if (tripId) return sendTripLink(ctx.chat.id, ctx.user!, tripId);
   await showMenu(ctx.user!);
 });
 handlers.command('help', help);

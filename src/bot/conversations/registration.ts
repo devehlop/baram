@@ -4,6 +4,7 @@ import { t } from '../../i18n.js';
 import { esc } from '../../lib/format.js';
 import { createUser, getUserByTg } from '../../services/users.js';
 import type { MyConversation } from '../context.js';
+import { sendTripLink, takeTripLink } from '../handlers/tripLink.js';
 import { showMenu } from '../ui/menu.js';
 import { column, Wizard } from '../wizard.js';
 import { runDriverForm } from './driverForm.js';
@@ -70,6 +71,10 @@ export async function registration(conv: MyConversation, ctx: Context): Promise<
   }
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
-    if (user) await showMenu(user, t('reg-done-passenger', { name: esc(userName) }));
+    if (!user) return;
+    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }));
+    // Пришёл по ссылке на рейс — показываем этот рейс сразу после регистрации.
+    const tripId = takeTripLink(from.id);
+    if (tripId) await sendTripLink(chatId, user, tripId);
   });
 }

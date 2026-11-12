@@ -263,7 +263,7 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
     can_connect_to_business: false,
     has_main_web_app: false,
   } as any;
-  initApp({ db, api: bot.api, adminIds: opts.adminIds ?? [ADMIN_ID] });
+  initApp({ db, api: bot.api, adminIds: opts.adminIds ?? [ADMIN_ID], botUsername: 'baram_test_bot' });
   await seed();
   const h: Harness = {
     bot,
