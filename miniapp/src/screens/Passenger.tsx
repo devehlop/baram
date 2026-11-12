@@ -52,6 +52,9 @@ export function Home() {
           <div className="hello__hi">Исәнмесез,</div>
           <div className="hello__name">{me.user!.name}</div>
         </div>
+        <div className="logo-square" aria-hidden="true">
+          <span style={{ color: '#FFFFFF', display: 'flex' }}><Icon name="arrow" size={28} stroke={2.6} /></span>
+        </div>
       </div>
 
       {last?.from && last.to && (
