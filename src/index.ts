@@ -28,6 +28,7 @@ async function main(): Promise<void> {
   await bot.api.setMyCommands([
     { command: 'start', description: t('cmd-start') },
     { command: 'help', description: t('cmd-help') },
+    { command: 'privacy', description: t('cmd-privacy') },
   ]);
   if (config.adminIds.length === 0) log.warn('ADMIN_IDS пуст: проверять водителей некому. Узнать свой ID — команда /id.');
 

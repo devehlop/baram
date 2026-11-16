@@ -269,9 +269,12 @@ function confirmStep(pattern: RegExp, question: string, yes: string, yesData: (i
   driver.callbackQuery(pattern, async (ctx) => {
     const id = num(ctx);
     const b = await getBooking(id);
+    const trip = b && (await getTrip(b.tripId));
+    // Имя пассажира показываем только водителю этого рейса, иначе по номеру брони можно узнать чужие имена.
+    if (!b || !trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
     await show(
       ctx,
-      t(question, { name: esc(b?.passengerName ?? t('passenger-unknown')) }),
+      t(question, { name: esc(b.passengerName ?? t('passenger-unknown')) }),
       kb([[{ text: t(yes), data: yesData(id) }], [{ text: t('btn-back'), data: `d:b:${id}` }]]),
     );
   });

@@ -15,6 +15,10 @@ handlers.command('id', async (ctx) => {
   await send(ctx.chat.id, t('your-id', { id: String(ctx.from?.id ?? '') }));
 });
 
+handlers.command('privacy', async (ctx) => {
+  await send(ctx.chat.id, t('privacy-policy'));
+});
+
 handlers.command('admin', adminMenu);
 
 // Всё остальное доступно только после регистрации. Исключение — кнопки админа:
