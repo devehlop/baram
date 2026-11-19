@@ -56,6 +56,77 @@ docker compose -f docker-compose.prod.yml logs -f bot
 
 С первым рейсом бот опубликует сводный пост «Рейсы на <день>» и дальше будет его обновлять.
 
+## Прокладка до Telegram
+
+Нужна, если с сервера не открывается `api.telegram.org`. Проверка:
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" https://api.telegram.org
+```
+
+`302` — Telegram доступен, прокладка не нужна. Ошибка или тишина — нужна.
+
+Прокладка — второй сервер за границей (например, в Казахстане), который пересылает запросы бота в Telegram. Данные пользователей на нём не хранятся. Ниже вариант, которому не нужны ни домен, ни порты 80 и 443: сертификат выпускает сама прокладка, а бот доверяет только ему.
+
+Ниже `1-2-3-4` — IP прокладки через дефисы (бесплатный адрес sslip.io), `IP_ОСНОВНОГО_СЕРВЕРА` — IP сервера с ботом.
+
+### На прокладке
+
+```bash
+mkdir -p ~/tg-api && cd ~/tg-api && nano Caddyfile
+```
+
+```
+{
+    skip_install_trust
+    auto_https disable_redirects
+}
+
+1-2-3-4.sslip.io:8443 {
+    tls internal
+
+    @chuzhie not remote_ip IP_ОСНОВНОГО_СЕРВЕРА
+    respond @chuzhie 403
+
+    reverse_proxy https://api.telegram.org {
+        header_up Host api.telegram.org
+    }
+}
+```
+
+```bash
+docker run -d --name tg-api --restart unless-stopped -p 8443:8443 -v ~/tg-api/Caddyfile:/etc/caddy/Caddyfile -v tg-api-data:/data caddy:2-alpine
+```
+
+Сертификат центра прокладки — его нужно будет передать боту. Он не секретный:
+
+```bash
+docker exec tg-api cat /data/caddy/pki/authorities/local/root.crt
+```
+
+### На основном сервере
+
+Сохраните сертификат из прошлого шага (вставьте весь текст от `-----BEGIN` до `-----END CERTIFICATE-----`):
+
+```bash
+mkdir -p ~/baram/certs && nano ~/baram/certs/tg-proxy.crt
+```
+
+Проверьте прокладку — должно быть `302`:
+
+```bash
+curl -sS --cacert ~/baram/certs/tg-proxy.crt -o /dev/null -w "%{http_code}\n" https://1-2-3-4.sslip.io:8443
+```
+
+Добавьте в `.env`:
+
+```
+TELEGRAM_API_ROOT=https://1-2-3-4.sslip.io:8443
+NODE_EXTRA_CA_CERTS=/certs/tg-proxy.crt
+```
+
+И перезапустите бота той же командой, которой запускали.
+
 ## Mini App
 
 Чат-бот работает и без него. Чтобы включить Mini App, нужен домен: Telegram открывает Mini App только по HTTPS.
