@@ -1,4 +1,4 @@
-import { and, eq, gte, ilike, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, ne, or, sql } from 'drizzle-orm';
 import { app } from '../app.js';
 import { bookings, users, type Restriction, type Role, type UserRow } from '../db/schema.js';
 import { now } from '../lib/time.js';
@@ -25,6 +25,8 @@ export async function createUser(input: {
   name: string;
   phone: string;
   role: Role;
+  /** Метка источника из ссылки; сохраняется только при первой регистрации. */
+  source?: string | null;
 }): Promise<UserRow> {
   const [row] = await app.db
     .insert(users)
@@ -34,6 +36,7 @@ export async function createUser(input: {
       name: input.name,
       phone: input.phone,
       activeRole: input.role,
+      source: input.source ?? null,
     })
     .onConflictDoUpdate({
       target: users.telegramId,
@@ -112,4 +115,35 @@ export async function userStats(userId: number): Promise<{ completed: number; no
     .from(bookings)
     .where(eq(bookings.bookedBy, userId));
   return { completed: row?.completed ?? 0, noShows: row?.noShows ?? 0, lateCancels: row?.lateCancels ?? 0 };
+}
+
+export interface SourceStat {
+  /** Метка источника; null — пришли без метки. */
+  source: string | null;
+  /** Зарегистрировались. */
+  users: number;
+  /** Из них оформили хотя бы одну бронь. */
+  bookers: number;
+  /** Брони, оформленные этими людьми (без «занято по телефону»). */
+  bookings: number;
+  /** Из них доехали. */
+  completed: number;
+}
+
+/** Сводка по источникам: регистрации → кто бронировал → брони → доехали. since — регистрации с этой даты. */
+export async function sourceStats(since?: Date): Promise<SourceStat[]> {
+  const rows = await app.db
+    .select({
+      source: users.source,
+      users: sql<number>`count(distinct ${users.id})::int`,
+      bookers: sql<number>`count(distinct ${bookings.bookedBy})::int`,
+      bookings: sql<number>`count(${bookings.id})::int`,
+      completed: sql<number>`count(${bookings.id}) filter (where ${bookings.status} = 'completed')::int`,
+    })
+    .from(users)
+    .leftJoin(bookings, and(eq(bookings.bookedBy, users.id), ne(bookings.source, 'phone')))
+    .where(since ? gte(users.createdAt, since) : undefined)
+    .groupBy(users.source)
+    .orderBy(desc(sql`count(distinct ${users.id})`), users.source);
+  return rows;
 }

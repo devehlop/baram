@@ -1,7 +1,9 @@
 import { Composer } from 'grammy';
 import { t } from '../../i18n.js';
 import type { MyContext } from '../context.js';
+import { parseStartLink, startPayloadOf } from '../../services/links.js';
 import { enter } from '../enter.js';
+import { sendTripLanding } from '../landing.js';
 import { answerCb, send } from '../tg.js';
 import { menuKeyOf, showMenu, type MenuKey } from '../ui/menu.js';
 import { admin, adminMenu } from './admin.js';
@@ -23,10 +25,16 @@ handlers.use(async (ctx, next) => {
   if (ctx.user) return next();
   if (ctx.isAdmin && ctx.callbackQuery?.data?.startsWith('a:')) return next();
   if (ctx.callbackQuery) await answerCb(ctx.callbackQuery.id);
-  await enter(ctx, 'registration');
+  // Метка из ссылки «?start=…» едет через всю регистрацию: источник и рейс, ради которого человек пришёл.
+  await enter(ctx, 'registration', startPayloadOf(ctx.message?.text));
 });
 
-handlers.command(['start', 'menu', 'cancel'], async (ctx) => {
+handlers.command('start', async (ctx) => {
+  await showMenu(ctx.user!);
+  const link = parseStartLink(startPayloadOf(ctx.message?.text));
+  if (link?.kind === 'trip') await sendTripLanding(ctx.chat.id, link.tripId, ctx.user!.id);
+});
+handlers.command(['menu', 'cancel'], async (ctx) => {
   await showMenu(ctx.user!);
 });
 handlers.command('help', help);

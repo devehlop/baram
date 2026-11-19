@@ -324,10 +324,12 @@ export async function tripCreate(conv: MyConversation, ctx: Context, mode: 'new'
         t('trip-published'),
         tripCard(trip, { own: true }),
         waitingRequests > 0 ? t('trip-published-requests', { n: waitingRequests }) : '',
+        t('trip-published-share'),
       ]
         .filter(Boolean)
         .join('\n\n'),
       kb([
+        [{ text: t('btn-share-trip'), data: `d:sh:${trip.id}` }],
         [{ text: t('btn-open-trip'), data: `d:t:${trip.id}` }],
         waitingRequests > 0 ? [{ text: t('menu-requests'), data: 'r:list' }] : [],
       ]),
