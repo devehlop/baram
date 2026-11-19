@@ -473,6 +473,7 @@ share-seats = { $n ->
 share-pickup-door = Забираю от дома, довожу до дома
 share-pickup-points = Забираю из точек: { $points }
 share-pickup-mixed = Забираю от дома или из точек: { $points }
+share-pickup-points-short = Забираю из своих точек — список в боте
 share-villages = Заезжаю в деревни, доплата по договорённости
 share-book = Забронировать место без звонка:
 share-book-by-link = Забронировать место без звонка — по ссылке.

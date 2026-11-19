@@ -244,3 +244,17 @@ describe('канал и админ', () => {
     expect(admin.last()).toContain('за всё время');
   });
 });
+
+describe('объявление для чата', () => {
+  it('ссылка «Поделиться» не длиннее 1900 символов даже при длинном списке точек', async () => {
+    const { shareUrl, shareText } = await import('../src/bot/ui/share.js');
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    const points = Array.from({ length: 12 }, (_, i) => `Остановка «Центральный рынок» №${i + 1}`);
+    const trip = await postTrip(201, { pickupMode: 'points', pickupPoints: points, villages: true });
+    const link = `https://t.me/baram_test_bot?start=t_${trip.id}`;
+    const url = shareUrl(trip, link);
+    expect(url.length).toBeLessThanOrEqual(1900);
+    expect(decodeURIComponent(url)).toContain('Буинск → Казань');
+    expect(shareText(trip, link)).toContain('№12'); // в сообщении самому водителю — полный текст
+  });
+});
