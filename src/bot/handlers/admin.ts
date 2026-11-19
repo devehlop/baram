@@ -10,7 +10,8 @@ import { getDriver, grantPrivilege, listDriversByStatus, revokePrivilege } from 
 import { candidateDrivers, getRequest, listEscalatedRequests } from '../../services/requests.js';
 import { loadSettings, SETTING_KEYS } from '../../services/settings.js';
 import { getTrip } from '../../services/trips.js';
-import { getUser, setRestriction, userStats } from '../../services/users.js';
+import { botLink, CHANNEL_SOURCE, DRIVER_SOURCE_PREFIX } from '../../services/links.js';
+import { getUser, setRestriction, sourceStats, userStats, type SourceStat } from '../../services/users.js';
 import { adminBookingDecision, closeRequestByAdmin, offerRequest, reviewDriver, showDriverForReview } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
@@ -43,11 +44,55 @@ export async function adminMenu(ctx: MyContext): Promise<void> {
       [{ text: t('adm-complaints-n', { n: complaints.length }), data: 'a:cmp' }],
       [{ text: t('adm-bookings-n', { n: bookings.length }), data: 'a:bk' }],
       [{ text: t('adm-users'), data: 'a:usr' }],
+      [{ text: t('adm-sources'), data: 'a:src' }],
       [{ text: t('adm-villages'), data: 'a:vil' }, { text: t('adm-settings'), data: 'a:set' }],
     ]),
   );
 }
 guarded.callbackQuery('a:menu', adminMenu);
+
+// ——— Откуда приходят ———
+
+/** Подпись источника: код друга как есть, рейс водителя — его имя, канал и «без метки» — словами. */
+async function sourceLabel(source: string | null): Promise<string> {
+  if (source === null) return t('src-none');
+  if (source === CHANNEL_SOURCE) return t('src-channel');
+  if (source.startsWith(DRIVER_SOURCE_PREFIX)) {
+    const driver = await getUser(Number(source.slice(DRIVER_SOURCE_PREFIX.length)));
+    return t('src-driver', { name: esc(driver?.name ?? '?') });
+  }
+  return esc(source);
+}
+
+async function sourceLine(x: SourceStat): Promise<string> {
+  return t('src-line', { label: await sourceLabel(x.source), users: x.users, bookers: x.bookers, bookings: x.bookings, completed: x.completed });
+}
+
+async function sourcesScreen(ctx: MyContext, days: number | null): Promise<void> {
+  const since = days === null ? undefined : new Date(now().getTime() - days * 86_400_000);
+  const stats = await sourceStats(since);
+  const example = botLink('s_aigul');
+  const text = [
+    `<b>${days === null ? t('adm-sources-title-all') : t('adm-sources-title', { days })}</b>`,
+    stats.length ? (await Promise.all(stats.map(sourceLine))).join('\n') : t('adm-sources-empty'),
+    example ? t('adm-sources-howto', { example: esc(example) }) : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  await show(
+    ctx,
+    text,
+    kb([
+      [
+        { text: t('adm-sources-30'), data: 'a:src' },
+        { text: t('adm-sources-all'), data: 'a:src:all' },
+      ],
+      menuBack(),
+    ]),
+  );
+}
+guarded.callbackQuery('a:src', (ctx) => sourcesScreen(ctx, 30));
+guarded.callbackQuery('a:src:all', (ctx) => sourcesScreen(ctx, null));
 
 // ——— Проверка водителей ———
 

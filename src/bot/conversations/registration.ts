@@ -2,8 +2,10 @@ import type { Context } from 'grammy';
 import type { Role } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { esc } from '../../lib/format.js';
+import { parseStartLink, sourceOf } from '../../services/links.js';
 import { createUser, getUserByTg } from '../../services/users.js';
 import type { MyConversation } from '../context.js';
+import { sendTripLanding } from '../landing.js';
 import { showMenu } from '../ui/menu.js';
 import { column, Wizard } from '../wizard.js';
 import { runDriverForm } from './driverForm.js';
@@ -19,8 +21,10 @@ export function cleanName(raw: string): string | null {
 /**
  * Первый запуск: «Вы пассажир или водитель?» → «Как вас зовут?» → телефон кнопкой.
  * Водитель сразу продолжает анкетой.
+ * startPayload — метка из ссылки t.me/<бот>?start=…: записывается как источник, а пассажиру,
+ * пришедшему по ссылке на рейс, после регистрации сразу показывается этот рейс.
  */
-export async function registration(conv: MyConversation, ctx: Context): Promise<void> {
+export async function registration(conv: MyConversation, ctx: Context, startPayload?: string | null): Promise<void> {
   const chatId = ctx.chat!.id;
   const from = ctx.from!;
   const w = new Wizard(conv, chatId);
@@ -60,7 +64,8 @@ export async function registration(conv: MyConversation, ctx: Context): Promise<
 
   const userName = name;
   await w.ext(async () => {
-    await createUser({ telegramId: from.id, username: from.username, name: userName, phone: phoneAns.phone, role });
+    const source = await sourceOf(startPayload);
+    await createUser({ telegramId: from.id, username: from.username, name: userName, phone: phoneAns.phone, role, source });
   });
 
   if (role === 'driver') {
@@ -70,6 +75,9 @@ export async function registration(conv: MyConversation, ctx: Context): Promise<
   }
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
-    if (user) await showMenu(user, t('reg-done-passenger', { name: esc(userName) }));
+    if (!user) return;
+    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }));
+    const link = parseStartLink(startPayload);
+    if (link?.kind === 'trip') await sendTripLanding(chatId, link.tripId, user.id);
   });
 }
