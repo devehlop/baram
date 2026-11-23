@@ -70,8 +70,22 @@ describe('гибкий поиск', () => {
     await admin.text('Альшеево');
     expect(admin.last()).toContain('Добавлено: Альшеево');
 
-    await searchTo(p, { village: 'Альшеево' });
-    expect(p.all()).toContain('За деревню может быть доплата');
+    await p.text('🚗 Найти поездку');
+    await p.press('Я сам');
+    await p.press('Деревня или село');
+    await p.press('Альшеево');
+    // Одно окно: предупреждение стоит над вопросом об адресе.
+    expect(p.last()).toContain('За деревню может быть доплата');
+    expect(p.last()).toContain('Напишите улицу и дом');
+    await p.text('ул. Ленина, 12');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    await p.press('Сегодня');
+    await p.press('Вечером');
+    await p.press('1');
+    await p.press('Нет');
+    await p.press('Только сумка');
+    await p.press('Пропустить');
     expect(p.last()).toContain('В деревни не заезжает');
   });
 

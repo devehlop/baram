@@ -546,7 +546,7 @@ const steps: Step<SearchState>[] = [
 export async function search(conv: MyConversation, ctx: Context, prefill?: SearchPrefill): Promise<void> {
   const chatId = ctx.chat!.id;
   const telegramId = ctx.from!.id;
-  const w = new Wizard(conv, chatId);
+  const w = new Wizard(conv, chatId, ctx.callbackQuery?.message?.message_id);
 
   const init = await w.ext(async () => {
     const user = await getUserByTg(telegramId);

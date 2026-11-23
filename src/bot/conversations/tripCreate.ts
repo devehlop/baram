@@ -265,7 +265,7 @@ const steps: Step<TripState>[] = [
 export async function tripCreate(conv: MyConversation, ctx: Context, mode: 'new' | 'repeat' = 'new'): Promise<void> {
   const chatId = ctx.chat!.id;
   const telegramId = ctx.from!.id;
-  const w = new Wizard(conv, chatId);
+  const w = new Wizard(conv, chatId, ctx.callbackQuery?.message?.message_id);
 
   const init = await w.ext(async () => {
     const user = await getUserByTg(telegramId);

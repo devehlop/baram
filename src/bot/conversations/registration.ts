@@ -27,7 +27,7 @@ export function cleanName(raw: string): string | null {
 export async function registration(conv: MyConversation, ctx: Context, startPayload?: string | null): Promise<void> {
   const chatId = ctx.chat!.id;
   const from = ctx.from!;
-  const w = new Wizard(conv, chatId);
+  const w = new Wizard(conv, chatId, ctx.callbackQuery?.message?.message_id);
 
   // Согласие на обработку персональных данных — до того, как спрашиваем имя и телефон.
   const consent = await w.ask({

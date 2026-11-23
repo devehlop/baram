@@ -52,10 +52,16 @@ async function refreshChannel(trip: Pick<TripView, 'directionId' | 'departsAt'>)
 }
 
 /** Сообщение заказчику и — если это другой человек с ботом — самому пассажиру. */
-async function tellRiders(b: BookingView, text: string, markup?: Parameters<typeof notifyUser>[2]): Promise<void> {
-  await notifyUser(b.booker?.id, text, markup);
-  if (b.passengerUserId && b.passengerUserId !== b.booker?.id) await notifyUser(b.passengerUserId, text);
+async function tellRiders(b: BookingView, text: string, markup?: Parameters<typeof notifyUser>[2], slot?: string): Promise<void> {
+  await notifyUser(b.booker?.id, text, markup, slot);
+  if (b.passengerUserId && b.passengerUserId !== b.booker?.id) await notifyUser(b.passengerUserId, text, undefined, slot);
 }
+
+/**
+ * Тема «живого» уведомления о ходе поездки: «Выехал» → «Буду через 10 мин» → «Сел в машину» → «Доехали».
+ * В чате остаётся только последнее из них — со звуком, но без ленты из старых статусов.
+ */
+const rideSlot = (b: Pick<BookingView, 'id'>) => `ride:${b.id}`;
 
 const who = (b: BookingView) => esc(b.passengerName ?? t('passenger-unknown'));
 
@@ -114,7 +120,7 @@ export async function departAction(tripId: number, driverId: number): Promise<bo
   await declineLeftovers(trip, leftovers);
   for (const b of await listTripBookings(tripId, ['accepted', 'confirmed'])) {
     if (b.source === 'phone') continue;
-    await tellRiders(b, t('ride-driver-departed', { driver: esc(trip.driver.name), phone: fmtPhone(trip.driver.phone) }));
+    await tellRiders(b, t('ride-driver-departed', { driver: esc(trip.driver.name), phone: fmtPhone(trip.driver.phone) }), undefined, rideSlot(b));
   }
   await refreshChannel(trip);
   return true;
@@ -135,8 +141,9 @@ export async function completeTripAction(tripId: number, driverId: number | null
         [{ text: t('btn-repeat'), data: `p:rep:${b.id}` }, { text: t('btn-reverse'), data: `p:rev:${b.id}` }],
         [{ text: t('btn-complain'), data: `p:cmp:${b.id}` }],
       ]),
+      rideSlot(b),
     );
-    if (b.passengerUserId && b.passengerUserId !== b.booker?.id) await notifyUser(b.passengerUserId, t('ride-arrived-self'));
+    if (b.passengerUserId && b.passengerUserId !== b.booker?.id) await notifyUser(b.passengerUserId, t('ride-arrived-self'), undefined, rideSlot(b));
   }
   await refreshChannel(trip);
   return true;
@@ -262,7 +269,8 @@ async function ownedBooking(bookingId: number, driverId: number) {
 export async function etaAction(bookingId: number, driverId: number, minutes: number): Promise<boolean> {
   const x = await ownedBooking(bookingId, driverId);
   if (!x || !['accepted', 'confirmed'].includes(x.b.status)) return false;
-  await tellRiders(x.b, t('ride-eta', { n: minutes }));
+  // Прошлый статус («Выехал») удаляется — телефон водителя повторяем, чтобы он всегда был под рукой.
+  await tellRiders(x.b, t('ride-eta', { n: minutes, phone: fmtPhone(x.trip.driver.phone) }), undefined, rideSlot(x.b));
   return true;
 }
 
@@ -279,7 +287,10 @@ export async function pickUpAction(bookingId: number, driverId: number): Promise
         car: carLine(trip.driver),
         plate: esc(trip.driver.plate),
         driver: esc(trip.driver.name),
+        phone: fmtPhone(trip.driver.phone),
       }),
+      undefined,
+      rideSlot(b),
     );
   }
   return true;
