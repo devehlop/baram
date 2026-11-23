@@ -2,7 +2,7 @@ import type { Context } from 'grammy';
 import type { Baggage, ChildSeat, PassengerType, Side, TimeKind } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone, money, normalizePhone } from '../../lib/format.js';
-import { dayKey, fmtDateTime, parseTime } from '../../lib/time.js';
+import { dayKey, fmtDateTime, minutesOfDay, parseTime } from '../../lib/time.js';
 import { getBooking, type BookingView } from '../../services/bookings.js';
 import { listLocalities, type LocalityView } from '../../services/directions.js';
 import type { RequestView } from '../../services/requests.js';
@@ -13,6 +13,7 @@ import { getTrip, type TripView } from '../../services/trips.js';
 import { getUserByTg } from '../../services/users.js';
 import { submitBooking, submitRequest } from '../actions.js';
 import type { MyConversation } from '../context.js';
+import { bookable } from '../landing.js';
 import { kb, send } from '../tg.js';
 import { baggageLine, bookingForPassenger, carLine, timeLabel, tripButton, tripCard } from '../ui/cards.js';
 import { column, grid, runSteps, Wizard, type Opt, type Outcome, type Step } from '../wizard.js';
@@ -42,6 +43,11 @@ interface SearchState {
   reviewed: boolean;
   /** Повтор прошлой поездки: спрашиваем только день и время. */
   prefilled: boolean;
+  /**
+   * Бронь конкретного рейса по ссылке из чата или канала: день и поиск пропускаются,
+   * «откуда» и «куда» — только по направлению рейса. Рейс ушёл или не подошёл — обычный поиск.
+   */
+  pinned?: TripView;
   passenger?: { name: string; phone: string; type: PassengerType; self: boolean };
   from?: Addr;
   to?: Addr;
@@ -58,16 +64,32 @@ interface SearchState {
   outcome?: { booking: BookingView; trip: TripView; needsAdmin: boolean } | { request: RequestView };
 }
 
-export interface SearchPrefill {
-  /** Повторить прошлую поездку: адреса, пассажир, места и багаж берутся из брони. */
-  bookingId: number;
-  /** «Обратно»: адреса меняются местами. */
-  reverse: boolean;
+export type SearchPrefill =
+  | {
+      /** Повторить прошлую поездку: адреса, пассажир, места и багаж берутся из брони. */
+      bookingId: number;
+      /** «Обратно»: адреса меняются местами. */
+      reverse: boolean;
+    }
+  | {
+      /** «Еду с ним» по ссылке на рейс. */
+      tripId: number;
+    };
+
+/** «Шаг n из 7»; при брони рейса по ссылке шага «Когда?» нет — шагов 6. */
+const head = (s: SearchState, n: number, question: string, note = '') => {
+  const step = s.pinned && n > 4 ? n - 1 : n;
+  return `<i>${t('step-of', { n: step, total: s.pinned ? 6 : 7 })}</i>\n<b>${question}</b>${note ? `\n${note}` : ''}`;
+};
+
+/** Место подходит рейсу из ссылки: то же направление, «откуда» — со стороны отправления, «куда» — с другой. */
+function fitsPinned(s: SearchState, l: { directionId: number; side: Side }, isTo: boolean): boolean {
+  if (!s.pinned) return true;
+  return l.directionId === s.pinned.directionId && (l.side === s.pinned.fromSide) !== isTo;
 }
 
-const TOTAL = 7;
-const head = (n: number, question: string, note = '') =>
-  `<i>${t('step-of', { n, total: TOTAL })}</i>\n<b>${question}</b>${note ? `\n${note}` : ''}`;
+/** Пройдя анкету, по ссылке на рейс выходим к итогу; после отказа от рейса — к обычному поиску. */
+const resultsStep = (s: SearchState) => (s.pinned ? 'summary' : 'results');
 
 const addrOf = (l: LocalityView, address: string, lat: number | null = null, lon: number | null = null): Addr => ({
   localityId: l.id,
@@ -92,7 +114,7 @@ function reachable(s: SearchState, l: { directionId: number; side: Side }): bool
 /** Вопрос про адрес: сохранённые адреса, города, деревни; затем улица и дом текстом или геопозицией. */
 async function askPlace(w: Wizard, s: SearchState, which: 'from' | 'to'): Promise<Addr | 'back' | 'home'> {
   const isTo = which === 'to';
-  const fits = (l: { directionId: number; side: Side }) => !isTo || reachable(s, l);
+  const fits = (l: { directionId: number; side: Side }) => (!isTo || reachable(s, l)) && fitsPinned(s, l, isTo);
   for (;;) {
     const saved = s.savedAddresses.filter(fits);
     const cityNames = [...new Set(s.localities.filter((l) => l.kind === 'city' && fits(l)).map((l) => l.name))];
@@ -103,7 +125,7 @@ async function askPlace(w: Wizard, s: SearchState, which: 'from' | 'to'): Promis
       ...(villages.length ? [[{ text: t('btn-village'), data: 'v' }]] : []),
     ];
     const a = await w.ask({
-      text: head(isTo ? 3 : 2, t(isTo ? 'search-ask-to' : 'search-ask-from'), t('search-place-note')),
+      text: head(s, isTo ? 3 : 2, t(isTo ? 'search-ask-to' : 'search-ask-from'), t('search-place-note')),
       rows,
     });
     if (a.kind !== 'btn') return a.kind === 'home' ? 'home' : 'back';
@@ -150,13 +172,52 @@ function alignFrom(s: SearchState): void {
   if (twin) s.from = { ...s.from, localityId: twin.id, directionId: twin.directionId, side: twin.side };
 }
 
+/** Точки сбора водителя: выбрать одну (или «от моего адреса», если водитель забирает и так, и так). */
+async function askPickupPoint(w: Wizard, s: SearchState, trip: TripView): Promise<'ok' | 'back' | 'home'> {
+  s.pickupPoint = null;
+  if (trip.pickupMode === 'door' || trip.pickupPoints.length === 0) return 'ok';
+  const p = await w.ask({
+    text: t('search-ask-point', { driver: esc(trip.driver.name) }),
+    rows: column([
+      ...trip.pickupPoints.map((name, i) => ({ text: name, data: `p${i}` })),
+      ...(trip.pickupMode === 'mixed' ? [{ text: t('point-my-address'), data: 'addr' }] : []),
+    ]),
+  });
+  if (p.kind !== 'btn') return p.kind === 'home' ? 'home' : 'back';
+  s.pickupPoint = p.data === 'addr' ? null : trip.pickupPoints[Number(p.data.slice(1))]!;
+  return 'ok';
+}
+
+/**
+ * Перед итогом брони по ссылке рейс проверяется заново: пока человек отвечал, места могли занять.
+ * Не подходит — объясняем и переходим к обычному поиску на тот же день и время.
+ */
+async function checkPinned(w: Wizard, s: SearchState): Promise<'ok' | Outcome> {
+  const pinned = s.pinned!;
+  const fresh = await w.ext(() => getTrip(pinned.id));
+  const problem = !fresh || !(await w.ext(async () => bookable(fresh, s.seats)))
+    ? 'search-trip-gone'
+    : s.childSeat === 'driver' && !fresh.driver.childSeat
+      ? 'search-trip-no-child-seat'
+      : null;
+  if (problem) {
+    await w.say(t(problem));
+    s.pinned = undefined;
+    return { goto: 'results' };
+  }
+  const point = await askPickupPoint(w, s, fresh!);
+  if (point !== 'ok') return point;
+  s.trip = fresh!;
+  return 'ok';
+}
+
 const steps: Step<SearchState>[] = [
   {
     id: 'who',
     when: (s) => !s.prefilled,
     run: async (w, s) => {
       const a = await w.ask({
-        text: head(1, t('search-ask-who')),
+        text: head(s, 1, t('search-ask-who')),
         rows: column([
           { text: t('who-self'), data: 'self' },
           ...s.savedPassengers.map((p) => ({ text: p.name, data: `p${p.id}` })),
@@ -214,7 +275,7 @@ const steps: Step<SearchState>[] = [
       // После исправления «откуда» старое «куда» могло перестать подходить.
       if (prevTo && !reachable(s, prevTo)) {
         s.to = undefined;
-        return { goto: 'to', returnTo: s.reviewed ? 'results' : undefined };
+        return { goto: 'to', returnTo: s.reviewed ? resultsStep(s) : undefined };
       }
       alignFrom(s);
       return 'next';
@@ -233,8 +294,9 @@ const steps: Step<SearchState>[] = [
   },
   {
     id: 'when',
+    when: (s) => !s.pinned,
     run: async (w, s) => {
-      const d = await w.ask({ text: head(4, t('search-ask-day')), rows: grid(dayButtons(s.days), 2) });
+      const d = await w.ask({ text: head(s, 4, t('search-ask-day')), rows: grid(dayButtons(s.days), 2) });
       if (d.kind !== 'btn') return nav(d) ?? 'back';
       const day = s.days[Number(d.data.slice(1))]!.day;
       const p = await w.ask({
@@ -273,9 +335,11 @@ const steps: Step<SearchState>[] = [
     id: 'seats',
     when: (s) => !s.prefilled,
     run: async (w, s) => {
+      // По ссылке на рейс — не больше, чем в нём свободно.
+      const max = s.pinned ? Math.max(1, Math.min(6, s.pinned.seatsFree)) : 6;
       const a = await w.ask({
-        text: head(5, t('search-ask-seats')),
-        rows: grid([1, 2, 3, 4, 5, 6].map((n) => ({ text: String(n), data: String(n) })), 3),
+        text: head(s, 5, t('search-ask-seats')),
+        rows: grid(Array.from({ length: max }, (_, i) => ({ text: String(i + 1), data: String(i + 1) })), 3),
       });
       if (a.kind !== 'btn') return nav(a) ?? 'back';
       const c = await w.ask({
@@ -297,7 +361,7 @@ const steps: Step<SearchState>[] = [
     when: (s) => !s.prefilled,
     run: async (w, s) => {
       const a = await w.ask({
-        text: head(6, t('search-ask-baggage')),
+        text: head(s, 6, t('search-ask-baggage')),
         rows: column([
           { text: t('baggage-btn-bag'), data: 'bag' },
           { text: t('baggage-btn-suitcase'), data: 'suitcase' },
@@ -323,7 +387,7 @@ const steps: Step<SearchState>[] = [
     when: (s) => !s.prefilled,
     run: async (w, s) => {
       const a = await w.ask({
-        text: head(7, t('search-ask-comment'), t('search-comment-note')),
+        text: head(s, 7, t('search-ask-comment'), t('search-comment-note')),
         rows: [[{ text: t('btn-skip'), data: 'skip' }]],
         acceptText: true,
         validate: (v) => (v.length <= 300 ? null : t('hint-text-length', { min: 1, max: 300 })),
@@ -336,6 +400,7 @@ const steps: Step<SearchState>[] = [
   },
   {
     id: 'results',
+    when: (s) => !s.pinned,
     run: async (w, s): Promise<Outcome> => {
       s.trip = undefined;
       s.pickupPoint = null;
@@ -398,17 +463,8 @@ const steps: Step<SearchState>[] = [
       }
 
       const trip = shown.find((x) => x.id === Number(a.data.slice(1)))!;
-      if (trip.pickupMode !== 'door' && trip.pickupPoints.length) {
-        const p = await w.ask({
-          text: t('search-ask-point', { driver: esc(trip.driver.name) }),
-          rows: column([
-            ...trip.pickupPoints.map((name, i) => ({ text: name, data: `p${i}` })),
-            ...(trip.pickupMode === 'mixed' ? [{ text: t('point-my-address'), data: 'addr' }] : []),
-          ]),
-        });
-        if (p.kind !== 'btn') return p.kind === 'home' ? 'home' : { goto: 'results' };
-        s.pickupPoint = p.data === 'addr' ? null : trip.pickupPoints[Number(p.data.slice(1))]!;
-      }
+      const point = await askPickupPoint(w, s, trip);
+      if (point !== 'ok') return point === 'home' ? 'home' : { goto: 'results' };
       s.trip = trip;
       return 'next';
     },
@@ -418,6 +474,10 @@ const steps: Step<SearchState>[] = [
     when: (s) => !s.outcome,
     run: async (w, s) => {
       s.reviewed = true;
+      if (s.pinned && s.trip?.id !== s.pinned.id) {
+        const pinned = await checkPinned(w, s);
+        if (pinned !== 'ok') return pinned;
+      }
       const trip = s.trip!;
       const p = s.passenger!;
       const lines = [
@@ -445,14 +505,15 @@ const steps: Step<SearchState>[] = [
       });
       if (a.kind !== 'btn') return nav(a) ?? 'back';
       if (a.data === 'fix') {
-        const fields = ['who', 'from', 'to', 'when', 'seats', 'baggage', 'comment'];
+        // День и время задаёт рейс из ссылки — их не исправляют.
+        const fields = ['who', 'from', 'to', 'when', 'seats', 'baggage', 'comment'].filter((f) => !(s.pinned && f === 'when'));
         const fix = await w.ask({
           text: t('ask-what-to-fix'),
           rows: grid(fields.map((f) => ({ text: t(`search-field-${f}`), data: f })), 2),
           home: false,
         });
         if (fix.kind !== 'btn') return { goto: 'summary' };
-        return { goto: fix.data, returnTo: 'results' };
+        return { goto: fix.data, returnTo: resultsStep(s) };
       }
       const res = await w.ext(() =>
         submitBooking({
@@ -471,6 +532,8 @@ const steps: Step<SearchState>[] = [
       );
       if (!res.ok) {
         await w.say(t(`bk-fail-${res.reason}`));
+        // Рейс из ссылки не получилось забронировать — показываем другие рейсы на этот день.
+        s.pinned = undefined;
         return { goto: 'results' };
       }
       s.outcome = { booking: res.booking, trip, needsAdmin: res.needsAdmin };
@@ -502,6 +565,20 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
       reviewed: false,
       prefilled: false,
     };
+    if (prefill && 'tripId' in prefill) {
+      // Свой рейс по своей же ссылке не бронируют; ушедший рейс — обычный поиск с первого шага.
+      const trip = await getTrip(prefill.tripId);
+      if (trip && trip.driverId !== user.id && bookable(trip)) {
+        Object.assign(state, {
+          pinned: trip,
+          localities: localities.filter((l) => l.directionId === trip.directionId),
+          day: dayKey(trip.departsAt),
+          timeKind: 'exact',
+          exactMinutes: minutesOfDay(trip.departsAt),
+        } satisfies Partial<SearchState>);
+      }
+      return state;
+    }
     const b = prefill ? await getBooking(prefill.bookingId) : undefined;
     if (b && b.booker?.id === user.id && b.from && b.to) {
       const place = (p: NonNullable<BookingView['from']>): Addr | undefined => {
@@ -532,6 +609,17 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
       t('search-repeat-intro', {
         from: `${esc(s.from!.city)}, ${esc(s.from!.address)}`,
         to: `${esc(s.to!.city)}, ${esc(s.to!.address)}`,
+      }),
+    );
+  }
+
+  if (prefill && 'tripId' in prefill && !s.pinned) await w.say(t('search-trip-gone'));
+  if (s.pinned) {
+    await w.say(
+      t('search-trip-intro', {
+        route: esc(s.pinned.route),
+        when: fmtDateTime(s.pinned.departsAt),
+        driver: esc(s.pinned.driver.name),
       }),
     );
   }

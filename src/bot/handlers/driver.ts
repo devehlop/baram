@@ -8,6 +8,7 @@ import {
   moveBookingUp,
   type BookingView,
 } from '../../services/bookings.js';
+import { tripShareLink } from '../../services/links.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../../services/trips.js';
 import { setActiveRole, userStats } from '../../services/users.js';
 import {
@@ -26,8 +27,9 @@ import {
 } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
-import { kb, type Btn } from '../tg.js';
+import { kb, send, type Btn } from '../tg.js';
 import { bookingForDriver, driverCard, tripCard } from '../ui/cards.js';
+import { shareText, shareUrl } from '../ui/share.js';
 import { showMenu } from '../ui/menu.js';
 import { num, requireDriver, show, toast } from './shared.js';
 
@@ -134,6 +136,7 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   const active = trip.status === 'published' || trip.status === 'departed';
   const rows: (Btn | false)[][] = list.map((b, i) => [{ text: passengerButton(b, i + 1), data: `d:b:${b.id}` }]);
   if (trip.status === 'published') {
+    if (trip.seatsFree > 0) rows.push([{ text: t('btn-share-trip'), data: `d:sh:${trip.id}` }]);
     rows.push([{ text: t('btn-departed'), data: `d:go:${trip.id}` }]);
     if (trip.seatsFree > 0) rows.push([{ text: t('btn-phone-booking'), data: `d:ph:${trip.id}` }]);
     rows.push([{ text: t('btn-cancel-trip'), data: `d:tc:${trip.id}` }]);
@@ -144,6 +147,25 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   await show(ctx, [tripCard(trip, { own: true }), header].filter(Boolean).join('\n\n'), kb(rows));
 }
 driver.callbackQuery(/^d:t:(\d+)$/, (ctx) => tripScreen(ctx, num(ctx)));
+
+/**
+ * «Поделиться рейсом»: готовое объявление со ссылкой на бронь — для чатов попутчиков.
+ * Водитель публикует его там, где и раньше; пассажир по ссылке попадает сразу на этот рейс.
+ */
+driver.callbackQuery(/^d:sh:(\d+)$/, async (ctx) => {
+  const trip = await getTrip(num(ctx));
+  if (!trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
+  if (trip.status !== 'published' || trip.seatsFree === 0) return toast(ctx, t('share-not-available'), true);
+  const link = tripShareLink(trip.id);
+  if (!link) return toast(ctx, t('action-not-available'), true);
+  await ctx.answerCallbackQuery();
+  await send(ctx.chat!.id, esc(shareText(trip, link)));
+  await send(
+    ctx.chat!.id,
+    t('share-hint'),
+    kb([[{ text: t('btn-share-to-chat'), url: shareUrl(trip, link) }], [{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]),
+  );
+});
 
 driver.callbackQuery(/^d:go:(\d+)$/, async (ctx) => {
   const ok = await departAction(num(ctx), ctx.user!.id);

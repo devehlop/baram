@@ -89,6 +89,12 @@ passenger.callbackQuery(/^p:yes:(\d+)$/, async (ctx) => {
   await show(ctx, t(ok ? 'bk-confirmed-thanks' : 'action-not-available'));
 });
 
+// «Еду с ним» в карточке рейса, открытой по ссылке из чата или канала.
+passenger.callbackQuery(/^p:bt:(\d+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await enter(ctx, 'search', { tripId: num(ctx) });
+});
+
 passenger.callbackQuery(/^p:(rep|rev):(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await enter(ctx, 'search', { bookingId: num(ctx, 2), reverse: ctx.match[1] === 'rev' });
