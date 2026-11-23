@@ -34,7 +34,7 @@ describe('регистрация', () => {
     await u.contact('89171234567');
     const user = await getUserByTg(101);
     expect(user).toMatchObject({ name: 'Айгуль', phone: '+79171234567', activeRole: 'passenger' });
-    expect(u.menu()).toEqual(['🚗 Найти поездку', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
+    expect(u.menu()).toEqual(['🚗 Найти поездку', '📋 Доска', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
   });
 
   it('без согласия дальше не пускает; политика доступна командой /privacy', async () => {

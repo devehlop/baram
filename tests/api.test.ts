@@ -159,3 +159,34 @@ describe('водитель в Mini App', () => {
     expect(p.last()).toContain('Поездка завершена');
   });
 });
+
+describe('доска в Mini App', () => {
+  it('рейсы и заявки на день по направлению; в заявках нет имени, телефона и адреса', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    await passenger(h, 101, 'Айгуль', '+79170000002');
+    await passenger(h, 102, 'Динар', '+79170000004');
+    await postTrip(201, { time: '17:00' });
+    await call(101, 'POST', '/api/requests', { ...ride, day: '2026-11-10', timeKind: 'evening' });
+
+    const res = await call(102, 'GET', '/api/board?route=1-a&day=2026-11-10');
+    expect(res.status).toBe(200);
+    expect(res.json.route).toMatchObject({ directionId: 1, fromSide: 'a', label: 'Буинск → Казань' });
+    expect(res.json.routes).toHaveLength(2);
+    expect(res.json.trips).toHaveLength(1);
+    expect(res.json.trips[0].driver).not.toHaveProperty('phone');
+    expect(res.json.trips[0].driver).not.toHaveProperty('plate');
+    expect(res.json.requests).toEqual([
+      expect.objectContaining({ fromCity: 'Буинск', toCity: 'Казань', seats: 1, timeKind: 'evening' }),
+    ]);
+    const raw = JSON.stringify(res.json.requests);
+    expect(raw).not.toContain('Айгуль');
+    expect(raw).not.toContain('917');
+    expect(raw).not.toContain('Ленина');
+
+    // Обратная сторона и другой день — пусто; непонятные параметры — первое направление и сегодня.
+    const back = await call(102, 'GET', '/api/board?route=1-b&day=2026-11-11');
+    expect(back.json).toMatchObject({ day: '2026-11-11', trips: [], requests: [] });
+    const fallback = await call(102, 'GET', '/api/board?route=zzz&day=когда-нибудь');
+    expect(fallback.json).toMatchObject({ day: '2026-11-10', route: { directionId: 1, fromSide: 'a' } });
+  });
+});

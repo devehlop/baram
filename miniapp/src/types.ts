@@ -51,6 +51,7 @@ export interface DayOption {
 
 export interface Trip {
   id: number;
+  driverId: number;
   directionId: number;
   fromSide: Side;
   route: string;
@@ -156,4 +157,36 @@ export interface DriverHome {
   days: DayOption[];
   priceMin: number;
   priceMax: number;
+}
+
+/** Маршрут доски: направление в одну сторону. */
+export interface BoardRoute {
+  directionId: number;
+  fromSide: Side;
+  label: string;
+}
+
+/** Заявка на доске — без имени, телефона и адреса. */
+export interface PublicRequest {
+  id: number;
+  route: string;
+  day: string;
+  timeKind: TimeKind;
+  exactMinutes: number | null;
+  fromCity: string;
+  toCity: string;
+  fromVillage: boolean;
+  toVillage: boolean;
+  seats: number;
+  baggage: Baggage;
+  childSeat: ChildSeat;
+}
+
+export interface BoardData {
+  routes: BoardRoute[];
+  days: DayOption[];
+  route: BoardRoute | null;
+  day: string;
+  trips: Trip[];
+  requests: PublicRequest[];
 }

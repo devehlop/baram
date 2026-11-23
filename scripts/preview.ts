@@ -13,7 +13,7 @@ import { migrate } from 'drizzle-orm/pglite/migrator';
 import { Api } from 'grammy';
 import { startApi } from '../src/api/server.js';
 import { initApp } from '../src/app.js';
-import { acceptBookingAction, publishTrip, submitBooking } from '../src/bot/actions.js';
+import { acceptBookingAction, publishTrip, submitBooking, submitRequest } from '../src/bot/actions.js';
 import type { Db } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
@@ -79,6 +79,9 @@ await submitBooking({
   ...ride, tripId: t1.id, bookedBy: danis.id, baggage: 'bag', comment: null,
   passenger: { name: 'Артур', phone: '+79175556677', type: 'teen' }, from: { localityId: 1, address: 'ул. Вахитова, 3' },
 });
+// Заявки на доске: пассажиры, которым не нашлось рейса.
+await submitRequest({ ...ride, userId: danis.id, directionId: 1, fromSide: 'a', day: day(1), timeKind: 'morning', seats: 2, childSeat: 'own', passenger: { name: 'Данис', phone: danis.phone, type: 'adult' } });
+await submitRequest({ ...ride, userId: danis.id, directionId: 1, fromSide: 'a', day: day(1), timeKind: 'exact', exactMinutes: 21 * 60, baggage: 'many', baggageNote: 'Две коробки', passenger: { name: 'Данис', phone: danis.phone, type: 'adult' } });
 await saveAddress({ userId: aigul.id, label: 'Дом', localityId: 1, address: 'ул. Ленина, 12' });
 await saveAddress({ userId: aigul.id, label: 'Общага', localityId: 2, address: 'ул. Деловая, 7' });
 

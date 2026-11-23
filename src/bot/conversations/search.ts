@@ -96,8 +96,15 @@ export type SearchPrefill =
       reverse: boolean;
     }
   | {
-      /** «Еду с ним» по ссылке на рейс. */
+      /** «Еду с ним» по ссылке на рейс или с доски. */
       tripId: number;
+    }
+  | {
+      /** С доски: маршрут и день уже выбраны — сразу рейсы этого дня или заявка. */
+      directionId: number;
+      fromSide: Side;
+      day: string;
+      request?: boolean;
     };
 
 const addrOf = (l: LocalityView, address: string, lat: number | null = null, lon: number | null = null): Addr => ({
@@ -675,6 +682,14 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
       }
       return { state, tripGone: !state.pinned };
     }
+    if (prefill && 'directionId' in prefill) {
+      state.route = routes.find((r) => r.directionId === prefill.directionId && r.fromSide === prefill.fromSide);
+      if (state.route && state.days.some((d) => d.day === prefill.day)) {
+        state.day = prefill.day;
+        if (prefill.request) state.mode = 'request';
+      }
+      return { state, tripGone: false };
+    }
     if (prefill) {
       const b = await getBooking(prefill.bookingId);
       const p = b && b.booker?.id === user.id ? prefillFrom(b, prefill.reverse, localities, routes, self) : null;
@@ -692,8 +707,8 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
   const s = init.state;
   if (init.tripGone) await w.say(t('search-trip-gone'));
 
-  // Рейс по ссылке уже ушёл — сразу к рейсам того же дня. «Назад» с первого шага закрывает поиск.
-  const start = s.route && s.day && !s.pinned && !s.from ? 'results' : undefined;
+  // С доски: сразу к рейсам дня или к заявке. «Назад» с первого шага закрывает поиск.
+  const start = s.route && s.day && !s.pinned && !s.from ? (s.mode === 'request' ? 'reqTime' : 'results') : undefined;
   const res = await runSteps(w, steps, s, start);
   if (res === 'home' || !s.outcome) {
     await w.say(t('search-cancelled'));
@@ -707,7 +722,7 @@ export async function search(conv: MyConversation, ctx: Context, prefill?: Searc
       const r = outcome.request;
       return {
         text: `${t('req-sent', { minutes: s.escalateMinutes })}\n\n${timeLabel(r.day, r.timeKind, r.exactMinutes)}, ${esc(r.route)}`,
-        rows: [[{ text: t('btn-cancel-request'), data: `p:rqx:${r.id}`, style: 'danger' }], [{ text: t('menu-my-trips'), data: 'p:trips' }]] as Btn[][],
+        rows: [[{ text: t('btn-cancel-request'), data: `p:rqx:${r.id}`, style: 'danger' }], [{ text: t('menu-board'), data: 'b:home' }, { text: t('menu-my-trips'), data: 'p:trips' }]] as Btn[][],
       };
     }
     const b = (await getBooking(outcome.booking.id)) ?? outcome.booking;
