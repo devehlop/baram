@@ -161,7 +161,7 @@ describe('водитель в Mini App', () => {
 });
 
 describe('доска в Mini App', () => {
-  it('рейсы и заявки на день по направлению; в заявках нет имени, телефона и адреса', async () => {
+  it('рейсы и заявки на день по направлению; в заявках — имя, но нет телефона и адреса', async () => {
     await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     await passenger(h, 101, 'Айгуль', '+79170000002');
     await passenger(h, 102, 'Динар', '+79170000004');
@@ -180,10 +180,9 @@ describe('доска в Mini App', () => {
     expect(res.json.trips[0].driver).not.toHaveProperty('photos');
     expect(JSON.stringify(res.json.trips)).not.toContain('car1');
     expect(res.json.requests).toEqual([
-      expect.objectContaining({ fromCity: 'Буинск', toCity: 'Казань', seats: 1, timeKind: 'evening' }),
+      expect.objectContaining({ name: 'Айгуль', avatar: true, fromCity: 'Буинск', toCity: 'Казань', seats: 1, timeKind: 'evening' }),
     ]);
     const raw = JSON.stringify(res.json.requests);
-    expect(raw).not.toContain('Айгуль');
     expect(raw).not.toContain('917');
     expect(raw).not.toContain('Ленина');
 
@@ -195,7 +194,7 @@ describe('доска в Mini App', () => {
   });
 });
 
-describe('фото машины в Mini App', () => {
+describe('фото машины и аватарки в Mini App', () => {
   /** Запрос картинки: статус, тип и байты как текст. */
   async function image(tgId: number | null, path: string) {
     const res = await api.request(path, {
@@ -220,5 +219,48 @@ describe('фото машины в Mini App', () => {
     expect((await image(101, `/api/trips/${trip.id}/photos/2`)).status).toBe(404);
     expect((await image(101, `/api/trips/999/photos/0`)).status).toBe(404);
     expect((await image(null, `/api/trips/${trip.id}/photos/0`)).status).toBe(401);
+  });
+
+  it('фото профиля водителя — если оно есть и открыто', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    await approvedDriver(h, 202, 'Рамиль', '+79170000003', { plate: 'В222ВВ116' });
+    await passenger(h, 101, 'Айгуль', '+79170000002');
+    const withPhoto = await postTrip(201, { time: '17:00' });
+    const without = await postTrip(202, { time: '18:00' });
+    h.tg.profilePhotos.set(201, 'ava201');
+
+    // Берётся размер, которого хватает на кружок, а не самый большой.
+    expect(await image(101, `/api/trips/${withPhoto.id}/avatar`)).toMatchObject({ status: 200, body: 'jpeg:photos/ava201-s.jpg' });
+    expect((await image(101, `/api/trips/${without.id}/avatar`)).status).toBe(404);
+  });
+
+  it('фото профиля пассажира в заявке — только когда он едет сам и заявка открыта', async () => {
+    await passenger(h, 101, 'Айгуль', '+79170000002');
+    await passenger(h, 102, 'Динар', '+79170000004');
+    h.tg.profilePhotos.set(101, 'ava101');
+    const self = await call(101, 'POST', '/api/requests', { ...ride, day: '2026-11-10', timeKind: 'evening' });
+    const forSon = await call(101, 'POST', '/api/requests', {
+      ...ride,
+      day: '2026-11-10',
+      timeKind: 'morning',
+      passenger: { name: 'Артур Галиев', phone: '+79175556677', type: 'teen' },
+    });
+
+    const board = await call(102, 'GET', '/api/board?route=1-a&day=2026-11-10');
+    expect(board.json.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: self.json.request.id, name: 'Айгуль', avatar: true }),
+        // За другого человека — только имя без фамилии и буква вместо фото того, кто оставил заявку.
+        expect.objectContaining({ id: forSon.json.request.id, name: 'Артур', avatar: false }),
+      ]),
+    );
+    expect(JSON.stringify(board.json.requests)).not.toContain('Галиев');
+
+    expect(await image(102, `/api/requests/${self.json.request.id}/avatar`)).toMatchObject({ status: 200, body: 'jpeg:photos/ava101-s.jpg' });
+    expect((await image(102, `/api/requests/${forSon.json.request.id}/avatar`)).status).toBe(404);
+
+    // Заявку отменили — её фото больше не отдаётся чужим.
+    await h.user(101).pressData(`p:rqx:${self.json.request.id}`);
+    expect((await image(102, `/api/requests/${self.json.request.id}/avatar`)).status).toBe(404);
   });
 });

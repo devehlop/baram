@@ -15,7 +15,7 @@ import { show } from './shared.js';
 
 /**
  * «📋 Доска» — все открытые рейсы водителей и заявки пассажиров на день, одним сообщением.
- * Вкладки, направление и день переключаются кнопками в том же сообщении. Заявки — без личных данных.
+ * Вкладки, направление и день переключаются кнопками в том же сообщении. У заявок — только имя, без телефона и адреса.
  *
  * Кнопки: b:<вкладка t|r>:<номер маршрута>:<день YYYY-MM-DD>[:<страница>].
  */
@@ -44,7 +44,7 @@ export function requestWhen(r: Pick<PublicRequest, 'timeKind' | 'exactMinutes'>)
 function requestLine(r: PublicRequest): string {
   const place = (city: string, village: boolean) => (village ? `${esc(city)} (${t('village-mark')})` : esc(city));
   return [
-    `<b>${requestWhen(r)}</b> · ${place(r.fromCity, r.fromVillage)} → ${place(r.toCity, r.toVillage)}`,
+    `<b>${requestWhen(r)}</b> · ${esc(r.name)} · ${place(r.fromCity, r.fromVillage)} → ${place(r.toCity, r.toVillage)}`,
     ` · ${t('seats-count', { n: r.seats })} · ${t(`card-baggage-${r.baggage}`).toLowerCase()}`,
     r.childSeat !== 'none' ? ' · 👶' : '',
   ].join('');

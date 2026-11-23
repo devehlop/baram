@@ -28,10 +28,10 @@ import { log } from '../logger.js';
 import { getBooking, listTripBookings, listUserBookings, type BookingView } from '../services/bookings.js';
 import { getLocality, listDirections, listLocalities, routeLabel } from '../services/directions.js';
 import { driverDirectionIds, getDriver } from '../services/drivers.js';
-import { listOpenRequestsForDriver, listUserOpenRequests } from '../services/requests.js';
+import { getRequest, listOpenRequestsForDriver, listUserOpenRequests } from '../services/requests.js';
 import { listAddresses, listPassengers, savePassenger } from '../services/saved.js';
-import { listRoutes, openRequests, openTrips } from '../services/board.js';
-import { getImage, type Image } from '../services/photos.js';
+import { listRoutes, openRequests, openTrips, requestForSelf } from '../services/board.js';
+import { getAvatar, getImage, type Image } from '../services/photos.js';
 import { searchTrips } from '../services/search.js';
 import { loadSettings } from '../services/settings.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../services/trips.js';
@@ -195,7 +195,7 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     return c.json({ exact: res.exact.map(publicTrip), near: res.near.map(publicTrip) });
   });
 
-  // ——— Доска: открытые рейсы и заявки на день. Видна всем, заявки — без имён, телефонов и адресов. ———
+  // ——— Доска: открытые рейсы и заявки на день. Видна всем, у заявок — имя пассажира, без телефонов и адресов. ———
   api.get('/api/board', async (c) => {
     const s = await loadSettings();
     const routes = await listRoutes();
@@ -210,13 +210,25 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     return c.json({ routes, days, route, day, trips: trips.map(publicTrip), requests });
   });
 
-  // ——— Картинки: фото машины. Mini App грузит их с той же подписью initData. ———
+  // ——— Картинки: фото машины и фото профиля Telegram. Mini App грузит их с той же подписью initData. ———
 
   // Фото машины видны всем, кто видит рейс: пассажир заранее знает, на чём поедет.
   api.get('/api/trips/:id/photos/:n', async (c) => {
     const trip = await getTrip(Number(c.req.param('id')));
     const fileId = trip?.driver.photos[Number(c.req.param('n'))];
     return imageResponse(fileId ? await getImage(fileId) : null);
+  });
+
+  api.get('/api/trips/:id/avatar', async (c) => {
+    const trip = await getTrip(Number(c.req.param('id')));
+    return imageResponse(trip ? await getAvatar(trip.driver.telegramId) : null);
+  });
+
+  // Фото профиля пассажира — только у открытой заявки и только если он едет сам, а не кто-то за него.
+  api.get('/api/requests/:id/avatar', async (c) => {
+    const r = await getRequest(Number(c.req.param('id')));
+    const ok = r && (r.status === 'open' || r.user.id === c.get('user').id) && requestForSelf(r);
+    return imageResponse(ok ? await getAvatar(r.user.telegramId) : null);
   });
 
   /** Пассажир из тела запроса: сам пользователь или другой человек (имя и телефон проверяются). */

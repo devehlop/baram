@@ -7,7 +7,7 @@ import { findPublishedTrips, type TripView } from './trips.js';
 
 /**
  * Доска: открытые рейсы водителей и заявки пассажиров на день, по направлению и стороне.
- * Её видят все, поэтому заявки — без имени, телефона и адреса.
+ * Её видят все, поэтому у заявок — только имя пассажира, без телефона и адреса.
  */
 
 export interface BoardRoute {
@@ -25,9 +25,13 @@ export async function listRoutes(): Promise<BoardRoute[]> {
   return out;
 }
 
-/** Заявка без личных данных: только города, время, места, багаж и кресло. */
+/** Заявка без телефона и адреса: имя пассажира, города, время, места, багаж и кресло. */
 export interface PublicRequest {
   id: number;
+  /** Имя пассажира — только первое слово, без фамилии. */
+  name: string;
+  /** Пассажир едет сам: можно показать фото его профиля Telegram. За другого человека — только буква. */
+  avatar: boolean;
   route: string;
   day: string;
   timeKind: TimeKind;
@@ -41,9 +45,21 @@ export interface PublicRequest {
   childSeat: ChildSeat;
 }
 
+/** «Айгуль Сафина» → «Айгуль». */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
+
+/** Заявку оставил сам пассажир, а не кто-то за него. */
+export function requestForSelf(r: Pick<RequestView, 'passengerPhone' | 'user'>): boolean {
+  return r.passengerPhone === r.user.phone;
+}
+
 export function publicRequest(r: RequestView): PublicRequest {
   return {
     id: r.id,
+    name: firstName(r.passengerName),
+    avatar: requestForSelf(r),
     route: r.route,
     day: r.day,
     timeKind: r.timeKind,

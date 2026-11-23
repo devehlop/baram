@@ -28,10 +28,14 @@ const pg = new PGlite();
 const db = drizzle(pg, { schema }) as unknown as Db;
 await migrate(drizzle(pg), { migrationsFolder: 'drizzle' });
 
-// Картинки-заглушки вместо фото машин из Telegram: машина нужного цвета.
+// Картинки-заглушки вместо фото из Telegram: машина нужного цвета и кружок-аватарка.
 const CAR_COLORS: Record<string, string> = { white: '#F4F1EA', grey: '#8D929A' };
 function demoImage(name: string): string {
-  const [, a = '', b = '0'] = name.replace(/\.svg$/, '').split('-');
+  const [kind, a = '', b = '0'] = name.replace(/\.svg$/, '').split('-');
+  if (kind === 'avatar') {
+    const hue = (Number(a) * 47) % 360;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="hsl(${hue} 45% 55%)"/><circle cx="80" cy="62" r="30" fill="#fff" opacity=".85"/><path d="M28 150c4-34 26-52 52-52s48 18 52 52" fill="#fff" opacity=".85"/></svg>`;
+  }
   const body = CAR_COLORS[a] ?? '#B0B0B0';
   const bg = ['#C9D6DF', '#D8CBB3', '#5B4636'][Number(b)] ?? '#C9D6DF';
   const label = ['спереди', 'сбоку', 'салон'][Number(b)] ?? '';
@@ -46,6 +50,11 @@ const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
   const method = u.split('/').pop();
   const p = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
   if (method === 'getFile') return json({ file_id: p.file_id, file_unique_id: p.file_id, file_path: `photos/${String(p.file_id)}.svg` });
+  if (method === 'getUserProfilePhotos') {
+    // У Айгуль фото профиля скрыто настройками — видна буква.
+    if (p.user_id === 1001) return json({ total_count: 0, photos: [] });
+    return json({ total_count: 1, photos: [[{ file_id: `avatar-${String(p.user_id)}`, file_unique_id: 'a', width: 160, height: 160 }]] });
+  }
   return json({ message_id: 1, date: 0, chat: { id: 1, type: 'private' } });
 }) as unknown as typeof fetch;
 initApp({ db, api: new Api('1:PREVIEW', { fetch: fakeFetch }), adminIds: [], botUsername: 'baram_bot' });

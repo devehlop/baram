@@ -63,7 +63,7 @@ export function Booking({ id }: { id: number }) {
 
       <div className="card">
         <div className="row">
-          <Avatar name={d.name} large />
+          <Avatar name={d.name} large src={`/trips/${trip.id}/avatar`} />
           <div>
             <div className="person__name" style={{ fontSize: 18 }}>{d.name}{d.badge ? ' · проверен' : ''}</div>
             <div className="person__sub">{car(d)}</div>

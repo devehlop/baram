@@ -42,6 +42,8 @@ export class FakeTelegram {
   /** Счётчик изменений: каждое новое или отредактированное сообщение получает следующий номер. */
   seq = 0;
 
+  /** Фото профиля: telegram id → file_id. Кого нет — у того фото нет или оно скрыто. */
+  profilePhotos = new Map<number, string>();
   /** Какие файлы скачивались по ссылке /file/bot<токен>/… */
   downloads: string[] = [];
 
@@ -119,6 +121,12 @@ export class FakeTelegram {
       }
       case 'getFile':
         return { file_id: p.file_id, file_unique_id: p.file_id, file_path: `photos/${p.file_id}.jpg` };
+      case 'getUserProfilePhotos': {
+        const fileId = this.profilePhotos.get(Number(p.user_id));
+        if (!fileId) return { total_count: 0, photos: [] };
+        const size = (suffix: string, side: number) => ({ file_id: `${fileId}${suffix}`, file_unique_id: fileId + suffix, width: side, height: side });
+        return { total_count: 1, photos: [[size('-s', 160), size('-m', 320), size('', 640)]] };
+      }
       case 'answerCallbackQuery':
         this.answers.push({ id: p.callback_query_id, text: p.text });
         return true;

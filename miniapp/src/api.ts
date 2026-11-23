@@ -31,7 +31,7 @@ export async function api<T>(path: string, body?: unknown, method?: 'GET' | 'POS
 }
 
 /**
- * Картинки (фото машины) тоже требуют подписи, а <img src> заголовок не передаёт.
+ * Картинки (фото машины, фото профиля) тоже требуют подписи, а <img src> заголовок не передаёт.
  * Поэтому качаем fetch-ем и показываем как blob:-ссылку. Одна картинка грузится один раз за сессию.
  */
 const images = new Map<string, Promise<string | null>>();

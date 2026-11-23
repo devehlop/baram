@@ -30,7 +30,7 @@ async function requestTomorrow(tgId: number) {
 }
 
 describe('доска: все рейсы и заявки', () => {
-  it('рейсы и заявки по дням и направлениям в одном сообщении, заявки — без личных данных', async () => {
+  it('рейсы и заявки по дням и направлениям в одном сообщении, у заявок — имя без телефона и адреса', async () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     await approvedDriver(h, 202, 'Рамиль', '+79170000003', { plate: 'В222ВВ116' });
     await passenger(h, 101, 'Айгуль', '+79170000002');
@@ -58,8 +58,7 @@ describe('доска: все рейсы и заявки', () => {
     await v.press('Завтра ▶');
     await v.press('🙋 Ищут попутку');
     const text = v.last();
-    expect(text).toContain('<b>утром</b> · Буинск → Казань · 2 места · чемодан · 👶');
-    expect(text).not.toContain('Айгуль');
+    expect(text).toContain('<b>утром</b> · Айгуль · Буинск → Казань · 2 места · чемодан · 👶');
     expect(text).not.toContain('917');
     expect(text).not.toContain('Ленина');
     // Пассажир заявку взять не может, а водитель — может, прямо с доски.

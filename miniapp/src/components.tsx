@@ -177,8 +177,14 @@ export function StatusTimeline({ steps, current }: { steps: string[]; current: n
   );
 }
 
-export function Avatar({ name, gold, large }: { name: string; gold?: boolean; large?: boolean }) {
-  return <div className={`avatar${gold ? ' avatar--gold' : ''}${large ? ' avatar--lg' : ''}`} aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</div>;
+/** Кружок с фото профиля Telegram. Пока фото грузится или его нет — первая буква имени. */
+export function Avatar({ name, gold, large, src }: { name: string; gold?: boolean; large?: boolean; src?: string | null }) {
+  const url = useImage(src);
+  return (
+    <div className={`avatar${gold ? ' avatar--gold' : ''}${large ? ' avatar--lg' : ''}`} aria-hidden="true">
+      {url ? <img className="avatar__img" src={url} alt="" /> : name.trim().charAt(0).toUpperCase()}
+    </div>
+  );
 }
 
 function CarPhoto({ path, className }: { path: string; className: string }) {
@@ -252,7 +258,7 @@ export function TripCard(props: { trip: Trip; first: boolean; village: boolean; 
           <div className="trip__price">{money(trip.price)}</div>
         </div>
         <div className="row">
-          <Avatar name={d.name} />
+          <Avatar name={d.name} src={`/trips/${trip.id}/avatar`} />
           <div>
             <div className="person__name">{d.name}</div>
             <div className="person__sub">{car(d)}</div>

@@ -167,9 +167,12 @@ export interface BoardRoute {
   label: string;
 }
 
-/** Заявка на доске — без имени, телефона и адреса. */
+/** Заявка на доске — имя пассажира без телефона и адреса. */
 export interface PublicRequest {
   id: number;
+  name: string;
+  /** Пассажир едет сам: есть смысл грузить фото его профиля. */
+  avatar: boolean;
   route: string;
   day: string;
   timeKind: TimeKind;
