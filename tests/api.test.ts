@@ -126,7 +126,8 @@ describe('водитель в Mini App', () => {
 
     const trip = { directionId: 1, fromSide: 'a', day: '2026-11-10', minutes: 17 * 60, pickupMode: 'points', pickupPoints: 'ТЦ Мега, Горки', villages: false, seats: 3, trunk: 'free', price: 500 };
     const posted = await call(201, 'POST', '/api/driver/trips', trip);
-    expect(posted.json.trip).toMatchObject({ route: 'Буинск → Казань', pickupPoints: ['ТЦ Мега', 'Горки'], seatsFree: 3 });
+    // Цену из запроса (старые версии Mini App) не берём: она одна на направление.
+    expect(posted.json.trip).toMatchObject({ route: 'Буинск → Казань', pickupPoints: ['ТЦ Мега', 'Горки'], seatsFree: 3, price: 800 });
     expect((await call(201, 'POST', '/api/driver/trips', trip)).json).toEqual({ error: 'duplicate' });
     expect((await call(201, 'POST', '/api/driver/trips', { ...trip, minutes: 8 * 60 })).json).toEqual({ error: 'past' });
     expect((await call(201, 'POST', '/api/driver/trips', { ...trip, day: '2026-11-11', seats: 6 })).json).toEqual({ error: 'seats' });
@@ -138,7 +139,7 @@ describe('водитель в Mini App', () => {
     const home = await call(201, 'GET', '/api/driver/home');
     expect(home.json.trips).toHaveLength(1);
     expect(home.json.pending).toMatchObject([{ booking: { id: bookingId, passengerName: 'Айгуль', pickupPoint: 'Горки' } }]);
-    expect(home.json.routes.map((r: any) => r.label)).toEqual(['Буинск → Казань', 'Казань → Буинск']);
+    expect(home.json.routes.map((r: any) => [r.label, r.price])).toEqual([['Буинск → Казань', 800], ['Казань → Буинск', 800]]);
 
     // Чужой водитель не может управлять рейсом и бронью.
     await approvedDriver(h, 202, 'Рамиль', '+79170000003', { plate: 'В222ВВ116' });

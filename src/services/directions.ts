@@ -75,3 +75,8 @@ export async function setChannel(directionId: number, channelId: string | null):
 export async function setTravelMinutes(directionId: number, minutes: number): Promise<void> {
   await app.db.update(directions).set({ travelMinutes: minutes }).where(eq(directions.id, directionId));
 }
+
+/** Цена места: одна на направление и на обе стороны. Действует для рейсов, выложенных после изменения. */
+export async function setDirectionPrice(directionId: number, price: number): Promise<void> {
+  await app.db.update(directions).set({ price }).where(eq(directions.id, directionId));
+}

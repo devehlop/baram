@@ -18,9 +18,7 @@ import { dayButtons, dayOptions, nav, type DayOption } from './common.js';
 interface TripState {
   userId: number;
   maxSeats: number;
-  priceMin: number;
-  priceMax: number;
-  routes: { directionId: number; fromSide: Side; label: string }[];
+  routes: { directionId: number; fromSide: Side; label: string; price: number }[];
   days: DayOption[];
   last: TripView | null;
   repeat: boolean;
@@ -36,6 +34,7 @@ interface TripState {
   villagesNote: string | null;
   seats?: number;
   trunk?: Trunk;
+  /** Цена из направления — водитель её не вводит. */
   price?: number;
   published?: { trip: TripView; waitingRequests: number };
 }
@@ -55,7 +54,6 @@ function toInput(s: TripState): TripInput {
     villagesNote: s.villages ? s.villagesNote : null,
     seats: s.seats!,
     trunk: s.trunk!,
-    price: s.price!,
   };
 }
 
@@ -73,6 +71,7 @@ const steps: Step<TripState>[] = [
       s.directionId = r.directionId;
       s.fromSide = r.fromSide;
       s.route = r.label;
+      s.price = r.price;
       return 'next';
     },
   },
@@ -105,7 +104,7 @@ const steps: Step<TripState>[] = [
 
       // Сразу проверяем день и время: лимиты, пересечения, дубли — чтобы не заполнять анкету зря.
       const problem = await w.ext(() =>
-        validateTrip({ ...toInput({ ...s, pickupMode: 'door', villages: false, trunk: 'free' }), seats: 1, price: s.priceMin }),
+        validateTrip({ ...toInput({ ...s, pickupMode: 'door', villages: false, trunk: 'free' }), seats: 1 }),
       );
       if (problem) {
         await w.say(t(`trip-problem-${problem}`));
@@ -198,29 +197,6 @@ const steps: Step<TripState>[] = [
     },
   },
   {
-    id: 'price',
-    when: (s) => !s.repeat,
-    run: async (w, s) => {
-      const hint = t('trip-price-hint', { min: money(s.priceMin), max: money(s.priceMax) });
-      const parse = (v: string) => {
-        const n = Number(v.replace(/[^\d]/g, ''));
-        return /\d/.test(v) && n >= s.priceMin && n <= s.priceMax ? n : null;
-      };
-      const prev = s.price ?? s.last?.price;
-      const a = await w.ask({
-        text: t('trip-ask-price'),
-        rows: prev ? [[{ text: t('btn-same-as-last', { value: money(prev) }), data: 'same' }]] : [],
-        acceptText: true,
-        hint,
-        validate: (v) => (parse(v) === null ? hint : null),
-      });
-      if (a.kind === 'btn') s.price = prev!;
-      else if (a.kind === 'text') s.price = parse(a.text)!;
-      else return nav(a) ?? 'back';
-      return 'next';
-    },
-  },
-  {
     id: 'summary',
     run: async (w, s) => {
       s.reviewed = true;
@@ -241,7 +217,7 @@ const steps: Step<TripState>[] = [
       });
       if (a.kind !== 'btn') return nav(a) ?? 'back';
       if (a.data === 'fix') {
-        const fields = ['route', 'day', 'time', 'pickup', 'villages', 'seats', 'trunk', 'price'];
+        const fields = ['route', 'day', 'time', 'pickup', 'villages', 'seats', 'trunk'];
         const fix = await w.ask({
           text: t('ask-what-to-fix'),
           rows: grid(fields.map((f) => ({ text: t(`trip-field-${f}`), data: f })), 2),
@@ -278,10 +254,8 @@ export async function tripCreate(conv: MyConversation, ctx: Context, mode: 'new'
     return {
       userId: user.id,
       maxSeats: driver.seats,
-      priceMin: set.price_min,
-      priceMax: set.price_max,
       routes: dirs.flatMap((d) =>
-        (['a', 'b'] as const).map((side) => ({ directionId: d.id, fromSide: side, label: routeLabel(d, side) })),
+        (['a', 'b'] as const).map((side) => ({ directionId: d.id, fromSide: side, label: routeLabel(d, side), price: d.price })),
       ),
       days: dayOptions(set.trip_horizon_days),
       last: (await lastTrip(user.id)) ?? null,
@@ -307,7 +281,7 @@ export async function tripCreate(conv: MyConversation, ctx: Context, mode: 'new'
       villagesNote: last.villagesNote,
       seats: Math.min(last.seatsTotal, init.maxSeats),
       trunk: last.trunk,
-      price: last.price,
+      price: init.routes.find((r) => r.directionId === last.directionId)?.price ?? last.price,
     } satisfies Partial<TripState>);
   }
 

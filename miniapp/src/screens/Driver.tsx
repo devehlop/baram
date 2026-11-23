@@ -22,7 +22,6 @@ const TRIP_ERRORS: Record<string, string> = {
   limit: 'В этот день у вас уже максимум рейсов в эту сторону.',
   duplicate: 'У вас уже есть рейс в эту сторону почти в это же время.',
   overlap: 'Рейс пересекается с другим вашим рейсом: не хватает времени на дорогу.',
-  price: 'Цена вне допустимых границ.',
   seats: 'Мест больше, чем в анкете машины.',
 };
 
@@ -290,7 +289,7 @@ export function PostTripScreen({ repeat }: { repeat?: boolean }) {
   const last = repeat ? data?.last : null;
   const [f, setF] = useState<{
     route: number; day: string; time: string; pickupMode: PickupMode; points: string; villages: boolean; villagesNote: string;
-    seats: number; trunk: Trunk; price: string;
+    seats: number; trunk: Trunk;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -317,7 +316,6 @@ export function PostTripScreen({ repeat }: { repeat?: boolean }) {
     villagesNote: last?.villagesNote ?? '',
     seats: Math.min(last?.seatsTotal ?? Math.min(3, data.driver.seats), data.driver.seats),
     trunk: last?.trunk ?? 'free',
-    price: last ? String(last.price) : '',
   };
   const set = (p: Partial<typeof form>) => { setF({ ...form, ...p }); setProblem(null); };
 
@@ -341,10 +339,9 @@ export function PostTripScreen({ repeat }: { repeat?: boolean }) {
   }
 
   const minutes = parseTime(form.time);
-  const price = Number(form.price.replace(/\D/g, ''));
   const route = data.routes[form.route];
   const pointsOk = form.pickupMode === 'door' || form.points.trim().length > 0;
-  const ready = !!route && minutes !== null && price >= data.priceMin && price <= data.priceMax && pointsOk;
+  const ready = !!route && minutes !== null && pointsOk;
 
   const publish = async () => {
     if (!route || minutes === null) return;
@@ -353,7 +350,7 @@ export function PostTripScreen({ repeat }: { repeat?: boolean }) {
       const res = await api<{ trip: Trip; waitingRequests: number }>('/driver/trips', {
         directionId: route.directionId, fromSide: route.fromSide, day: form.day, minutes,
         pickupMode: form.pickupMode, pickupPoints: form.points, villages: form.villages, villagesNote: form.villagesNote || null,
-        seats: form.seats, trunk: form.trunk, price,
+        seats: form.seats, trunk: form.trunk,
       });
       haptic('success');
       setPosted(res);
@@ -399,8 +396,14 @@ export function PostTripScreen({ repeat }: { repeat?: boolean }) {
         {seg(Array.from({ length: data.driver.seats }, (_, i) => ({ value: i + 1, label: String(i + 1) })), form.seats, (v) => set({ seats: v }))}</div>
       <div className="field"><span className="field__label">Багажник</span>
         {seg(TRUNKS.map((t) => ({ value: t.trunk, label: t.label })), form.trunk, (v) => set({ trunk: v }))}</div>
-      <label className="field"><span className="field__label">Цена за место, ₽ (от {data.priceMin} до {data.priceMax})</span>
-        <input className="input" inputMode="numeric" maxLength={5} placeholder="500" value={form.price} onChange={(e) => set({ price: e.target.value })} /></label>
+      {route && (
+        <>
+          <div className="rows">
+            <div className="rows__row"><span className="rows__label">Цена за место</span><span className="rows__value">{money(route.price)}</span></div>
+          </div>
+          <p className="muted">Цена одна для всех водителей, её задаёт Барам. Доплата за деревни — по договорённости.</p>
+        </>
+      )}
       {problem && <ErrorNote>{problem}</ErrorNote>}
       <div className="spacer" />
       <Button disabled={!ready || busy} onClick={() => void publish()}>Выложить</Button>

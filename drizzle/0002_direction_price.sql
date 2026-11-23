@@ -1,0 +1,1 @@
+ALTER TABLE "directions" ADD COLUMN "price" integer DEFAULT 800 NOT NULL;

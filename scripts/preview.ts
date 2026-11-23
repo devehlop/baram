@@ -55,18 +55,18 @@ const rustam = await driver(2002, 'Рустам', 'Сафин Рустам Ма�
 await grantPrivilege(ildar.id, 'verified_badge', null, null);
 
 const day = (offset: number) => addDays(todayKey(), offset);
-async function trip(driverId: number, offset: number, minutes: number, fromSide: 'a' | 'b', price: number, extra: Partial<Parameters<typeof publishTrip>[0]> = {}) {
+async function trip(driverId: number, offset: number, minutes: number, fromSide: 'a' | 'b', extra: Partial<Parameters<typeof publishTrip>[0]> = {}) {
   const res = await publishTrip({
     driverId, directionId: 1, fromSide, departsAt: fromDayMinutes(day(offset), minutes), pickupMode: 'door', pickupPoints: [],
-    villages: false, villagesNote: null, seats: 3, trunk: 'free', price, ...extra,
+    villages: false, villagesNote: null, seats: 3, trunk: 'free', ...extra,
   });
   if (!('trip' in res) || !res.trip) throw new Error(`Демо-рейс не создан: ${JSON.stringify(res)}`);
   return res.trip;
 }
-const t1 = await trip(ildar.id, 1, 17 * 60, 'a', 500, { villages: true, villagesNote: 'Альшеево, Кият' });
-await trip(rustam.id, 1, 18 * 60 + 30, 'a', 450, { pickupMode: 'points', pickupPoints: ['Автовокзал', 'Площадь'], trunk: 'half' });
-await trip(rustam.id, 2, 9 * 60, 'a', 450);
-await trip(ildar.id, 3, 18 * 60, 'b', 500);
+const t1 = await trip(ildar.id, 1, 17 * 60, 'a', { villages: true, villagesNote: 'Альшеево, Кият' });
+await trip(rustam.id, 1, 18 * 60 + 30, 'a', { pickupMode: 'points', pickupPoints: ['Автовокзал', 'Площадь'], trunk: 'half' });
+await trip(rustam.id, 2, 9 * 60, 'a');
+await trip(ildar.id, 3, 18 * 60, 'b');
 
 const ride = {
   from: { localityId: 1, address: 'ул. Ленина, 12' },

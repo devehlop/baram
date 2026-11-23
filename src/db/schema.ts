@@ -104,6 +104,8 @@ export const directions = pgTable('directions', {
   cityA: text('city_a').notNull(),
   cityB: text('city_b').notNull(),
   travelMinutes: integer('travel_minutes').notNull().default(120),
+  /** Цена места в одну сторону, ₽. Одна на обе стороны, ставит админ; водитель её не меняет. */
+  price: integer('price').notNull().default(800),
   channelId: text('channel_id'),
   active: boolean('active').notNull().default(true),
 });

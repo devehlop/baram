@@ -29,7 +29,6 @@ async function tripInput(tg: number, time: string, o: { side?: 'a' | 'b'; dayOff
     villagesNote: null,
     seats: 3,
     trunk: 'free' as const,
-    price: 500,
   };
 }
 
@@ -83,7 +82,7 @@ describe('защита от спама при выкладке рейса', () =
 
   it('в сценарии: повтор рейса в то же время не проходит, «Повторить прошлый» — день и «Выложить»', async () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
-    await postTrip(201, { time: '17:00', price: 450 });
+    await postTrip(201, { time: '17:00' });
     await d.text('➕ Выложить рейс');
     expect(d.buttons()[0]).toContain('Повторить: Буинск → Казань, 17:00');
     await d.press('Повторить');
@@ -94,7 +93,7 @@ describe('защита от спама при выкладке рейса', () =
     await d.press('Завтра');
     await d.press('17:00'); // «Как в прошлый раз: 17:00»
     expect(d.last()).toContain('ср, 11 ноября в 17:00');
-    expect(d.last()).toContain('450 ₽');
+    expect(d.last()).toContain('800 ₽');
     await d.press('Выложить');
     expect(d.last()).toContain('Рейс выложен');
   });

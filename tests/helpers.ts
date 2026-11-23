@@ -336,7 +336,7 @@ export async function dbId(telegramId: number): Promise<number> {
 }
 
 /** Рейс напрямую через действие (как если бы водитель прошёл сценарий). dayOffset: 0 — сегодня. */
-export async function postTrip(telegramId: number, opts: Partial<{ fromSide: 'a' | 'b'; dayOffset: number; time: string; seats: number; price: number; villages: boolean; pickupMode: 'door' | 'points' | 'mixed'; pickupPoints: string[] }> = {}) {
+export async function postTrip(telegramId: number, opts: Partial<{ fromSide: 'a' | 'b'; dayOffset: number; time: string; seats: number; villages: boolean; pickupMode: 'door' | 'points' | 'mixed'; pickupPoints: string[] }> = {}) {
   const [hh, mm] = (opts.time ?? '17:00').split(':').map(Number);
   const res = await publishTrip({
     driverId: await dbId(telegramId),
@@ -349,7 +349,6 @@ export async function postTrip(telegramId: number, opts: Partial<{ fromSide: 'a'
     villagesNote: null,
     seats: opts.seats ?? 3,
     trunk: 'free',
-    price: opts.price ?? 500,
   });
   if (!('trip' in res) || !res.trip) throw new Error(`Рейс не создан: ${JSON.stringify(res)}`);
   return res.trip;

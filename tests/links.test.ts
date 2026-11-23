@@ -80,7 +80,7 @@ describe('«Поделиться рейсом» и бронь по ссылке'
     const post = msgs[msgs.length - 2]!.text; // само объявление — для пересылки и копирования
     expect(post).toContain('🚗 Еду Буинск → Казань');
     expect(post).toContain('Сегодня, 10 ноября · 17:30');
-    expect(post).toContain('Свободно: 3 места · 500 ₽ с человека');
+    expect(post).toContain('Свободно: 3 места · 800 ₽ с человека');
     expect(post).toContain('Забираю от дома');
     expect(post).toContain('Заезжаю в деревни');
     expect(post).not.toContain('+7 917'); // номер в копии водитель допишет сам
