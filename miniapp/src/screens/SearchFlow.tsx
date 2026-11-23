@@ -529,7 +529,7 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
       return (
         <Screen>
           <PageHeader title={`${draft.from!.city} → ${draft.to!.city}`} sub={sub} onBack={stepBack} />
-          {!found && !error && <div className="loading"><Rosette size={64} /><div className="muted">Ищем рейсы…</div></div>}
+          {!found && !error && <div className="loading"><Rosette size={44} /><div className="muted">Ищем рейсы…</div></div>}
           {error && <ErrorNote>{errorText(error)}</ErrorNote>}
           {exact.map((t, i) => <TripCard key={t.id} trip={t} first={i === 0} {...opts} onPick={() => pick(t)} />)}
           {found && near.length > 0 && (
@@ -540,7 +540,7 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
           ))}
           {found && exact.length + near.length === 0 && (
             <div className="loading">
-              <Rosette size={72} />
+              <Rosette size={44} />
               <p><b>Рейсов на это время пока нет</b></p>
               <p className="muted">Оставьте заявку — её увидят все водители направления.</p>
             </div>
@@ -663,7 +663,7 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
       return (
         <Screen>
           <div className="loading">
-            <Rosette size={88} />
+            <Rosette size={56} />
             <h1 className="title">Заявка отправлена водителям</h1>
             <p className="muted">Как только водитель возьмёт её, мы напишем в чат. Если за полчаса никто не возьмёт — передадим диспетчеру.</p>
           </div>

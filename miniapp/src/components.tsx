@@ -121,7 +121,7 @@ export function PageHeader(props: { title: string; sub?: string; onBack: () => v
 export function OptionCard(props: { title: string; sub?: string; icon: IconName; selected?: boolean; onClick: () => void }) {
   return (
     <button type="button" className="option" aria-pressed={!!props.selected} onClick={props.onClick}>
-      <span className="option__icon"><Icon name={props.icon} size={26} /></span>
+      <span className="option__icon"><Icon name={props.icon} size={20} /></span>
       <span className="option__text">
         <span className="option__title">{props.title}</span>
         {props.sub && <span className="option__sub">{props.sub}</span>}
@@ -134,7 +134,7 @@ export function MenuTile(props: { label: string; hint?: string; icon: IconName; 
   return (
     <button type="button" className={`tile${props.primary ? ' tile--primary' : ''}`} onClick={props.onClick}>
       <span className="tile__icon">
-        <Icon name={props.icon} size={34} />
+        <Icon name={props.icon} size={26} />
         {!!props.count && <span className="badge-count" aria-label={`Новых: ${props.count}`}>{props.count}</span>}
       </span>
       <span>
@@ -228,7 +228,7 @@ export function Loading({ text = 'Загружаем…' }: { text?: string }) {
   return (
     <div className="screen">
       <div className="loading">
-        <Rosette size={64} />
+        <Rosette size={44} />
         <div className="muted">{text}</div>
       </div>
     </div>

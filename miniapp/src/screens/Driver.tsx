@@ -138,7 +138,7 @@ export function DriverTripsScreen() {
       <PageHeader title="Мои рейсы" big onBack={back} />
       {data.trips.length === 0 && (
         <div className="loading">
-          <Rosette size={72} />
+          <Rosette size={44} />
           <p className="muted">Рейсов пока нет</p>
         </div>
       )}
@@ -170,7 +170,7 @@ export function DriverTripScreen({ id }: { id: number }) {
     return (
       <Screen>
         <div className="loading">
-          <Rosette size={88} />
+          <Rosette size={56} />
           <h1 className="title">{done}</h1>
         </div>
         <Button onClick={back}>Готово</Button>

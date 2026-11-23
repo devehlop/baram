@@ -53,7 +53,7 @@ export function Home() {
           <div className="hello__name">{me.user!.name}</div>
         </div>
         <div className="logo-square" aria-hidden="true">
-          <span style={{ color: '#FFFFFF', display: 'flex' }}><Icon name="arrow" size={28} stroke={2.6} /></span>
+          <span style={{ color: '#FFFFFF', display: 'flex' }}><Icon name="arrow" size={22} stroke={2.6} /></span>
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export function Home() {
 export function BoardLink({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" className="card card--row" onClick={onClick}>
-      <span className="option__icon"><Icon name="list" size={26} /></span>
+      <span className="option__icon"><Icon name="list" size={20} /></span>
       <span style={{ flex: 1 }}>
         <span style={{ display: 'block', fontSize: 18, fontWeight: 700 }}>Доска</span>
         <span className="small muted">Все рейсы водителей и заявки пассажиров</span>
@@ -139,7 +139,7 @@ export function MyTrips() {
       {error && <ErrorNote>{errorText(error)}</ErrorNote>}
       {empty && (
         <div className="loading">
-          <Rosette size={72} />
+          <Rosette size={44} />
           <p className="muted">Поездок пока нет</p>
         </div>
       )}

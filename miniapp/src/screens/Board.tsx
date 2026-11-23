@@ -94,7 +94,7 @@ export function Board(props: { initialRoute?: string; initialDay?: string; initi
               )}
               {data.trips.length === 0 && (
                 <div className="loading">
-                  <Rosette size={64} />
+                  <Rosette size={40} />
                   <p><b>На этот день рейсов пока нет</b></p>
                   <p className="muted">Оставьте заявку — её увидят все водители направления.</p>
                 </div>
@@ -130,7 +130,7 @@ export function Board(props: { initialRoute?: string; initialDay?: string; initi
               ))}
               {data.requests.length === 0 && (
                 <div className="loading">
-                  <Rosette size={64} />
+                  <Rosette size={40} />
                   <p className="muted">На этот день заявок нет</p>
                 </div>
               )}
