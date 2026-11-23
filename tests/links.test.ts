@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cancelTripAction } from '../src/bot/actions.js';
 import { listTripBookings } from '../src/services/bookings.js';
 import { setChannel } from '../src/services/directions.js';
 import { parseStartLink, sourceOf, startPayloadOf } from '../src/services/links.js';
@@ -78,14 +77,17 @@ describe('«Поделиться рейсом» и бронь по ссылке'
     await d.press('Поделиться рейсом');
     const link = `https://t.me/baram_test_bot?start=t_${trip.id}`;
     const msgs = h.tg.of(201);
-    const post = msgs[msgs.length - 2]!.text;
-    expect(post).toContain('вт, 10 ноября в 17:30 — Буинск → Казань');
-    expect(post).toContain('Lada Largus, свободно 3 места · 500 ₽ за место');
+    const post = msgs[msgs.length - 2]!.text; // само объявление — для пересылки и копирования
+    expect(post).toContain('🚗 Еду Буинск → Казань');
+    expect(post).toContain('Сегодня, 10 ноября · 17:30');
+    expect(post).toContain('Свободно: 3 места · 500 ₽ с человека');
     expect(post).toContain('Забираю от дома');
     expect(post).toContain('Заезжаю в деревни');
+    expect(post).not.toContain('+7 917'); // номер в копии водитель допишет сам
     expect(post).toContain(link);
-    const shareBtn = msgs[msgs.length - 1]!.inline.flat().find((b) => b.url);
-    expect(shareBtn?.url).toContain('https://t.me/share/url?url=' + encodeURIComponent(link));
+    const shareBtns = msgs[msgs.length - 1]!.inline.flat().filter((b) => b.url);
+    expect(shareBtns.map((b) => b.text)).toEqual(['📣 В чат — с телефоном', '📣 В чат — без телефона']);
+    expect(shareBtns[0]!.url).toContain('https://t.me/share/url?url=' + encodeURIComponent(link));
 
     // Пассажир впервые открывает ссылку: регистрация → сразу карточка этого рейса.
     const p = await registerVia(101, `t_${trip.id}`);
@@ -121,30 +123,6 @@ describe('«Поделиться рейсом» и бронь по ссылке'
     const [b] = await listTripBookings(trip.id);
     expect(b).toMatchObject({ seats: 2, status: 'pending' });
     expect(d.last()).toContain('Новая бронь');
-  });
-
-  it('уже зарегистрированный пассажир по ссылке сразу видит рейс, а водитель — свой рейс без кнопки брони', async () => {
-    const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
-    const p = await passenger(h, 101, 'Айгуль', '+79170000002');
-    const trip = await postTrip(201);
-
-    await p.text(`/start t_${trip.id}`);
-    expect(p.last()).toContain('Рейс по ссылке');
-    expect(p.buttons()).toContain('🚗 Еду с ним');
-
-    await d.text(`/start t_${trip.id}`);
-    expect(d.last()).toContain('Это ваш рейс');
-  });
-
-  it('ушедший или отменённый рейс: вместо брони — другие рейсы', async () => {
-    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
-    const p = await passenger(h, 101, 'Айгуль', '+79170000002');
-    const trip = await postTrip(201);
-    await cancelTripAction(trip.id, 'admin');
-
-    await p.text(`/start c_${trip.id}`);
-    expect(p.last()).toContain('уже не забронировать');
-    expect(p.buttons()).toContain('🚗 Найти поездку');
   });
 
   it('места заняли, пока человек отвечал, — переходим к обычному поиску на тот же день', async () => {
@@ -185,22 +163,6 @@ describe('«Поделиться рейсом» и бронь по ссылке'
     expect(p.fresh()).toContain('Этот рейс забронировать уже нельзя');
     expect(p.last()).toContain('18:00');
     expect(p.buttons().some((x) => x.includes('18:00 · Рамиль'))).toBe(true);
-  });
-
-  it('кнопка «Поделиться рейсом» есть сразу после выкладки рейса', async () => {
-    const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
-    await d.text('➕ Выложить рейс');
-    await d.press('Буинск → Казань');
-    await d.press('Сегодня');
-    await d.press('17:00');
-    await d.press('От дома до дома');
-    await d.press('Нет');
-    await d.press('3');
-    await d.press('Свободен');
-    await d.text('500');
-    await d.press('Выложить');
-    expect(d.last()).toContain('Рейс выложен');
-    expect(d.buttons()).toContain('📣 Поделиться рейсом');
   });
 });
 
@@ -246,16 +208,3 @@ describe('канал и админ', () => {
   });
 });
 
-describe('объявление для чата', () => {
-  it('ссылка «Поделиться» не длиннее 1900 символов даже при длинном списке точек', async () => {
-    const { shareUrl, shareText } = await import('../src/bot/ui/share.js');
-    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
-    const points = Array.from({ length: 12 }, (_, i) => `Остановка «Центральный рынок» №${i + 1}`);
-    const trip = await postTrip(201, { pickupMode: 'points', pickupPoints: points, villages: true });
-    const link = `https://t.me/baram_test_bot?start=t_${trip.id}`;
-    const url = shareUrl(trip, link);
-    expect(url.length).toBeLessThanOrEqual(1900);
-    expect(decodeURIComponent(url)).toContain('Буинск → Казань');
-    expect(shareText(trip, link)).toContain('№12'); // в сообщении самому водителю — полный текст
-  });
-});

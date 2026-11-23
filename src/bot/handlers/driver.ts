@@ -29,7 +29,7 @@ import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
 import { kb, send, type Btn } from '../tg.js';
 import { bookingForDriver, driverCard, tripCard } from '../ui/cards.js';
-import { shareText, shareUrl } from '../ui/share.js';
+import { canShare, shareRows, shareText } from '../ui/share.js';
 import { showMenu } from '../ui/menu.js';
 import { num, requireDriver, show, toast } from './shared.js';
 
@@ -136,7 +136,7 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   const active = trip.status === 'published' || trip.status === 'departed';
   const rows: (Btn | false)[][] = list.map((b, i) => [{ text: passengerButton(b, i + 1), data: `d:b:${b.id}` }]);
   if (trip.status === 'published') {
-    if (trip.seatsFree > 0) rows.push([{ text: t('btn-share-trip'), data: `d:sh:${trip.id}` }]);
+    if (canShare(trip)) rows.push([{ text: t('btn-share-trip'), data: `d:sh:${trip.id}` }]);
     rows.push([{ text: t('btn-departed'), data: `d:go:${trip.id}` }]);
     if (trip.seatsFree > 0) rows.push([{ text: t('btn-phone-booking'), data: `d:ph:${trip.id}` }]);
     rows.push([{ text: t('btn-cancel-trip'), data: `d:tc:${trip.id}` }]);
@@ -155,16 +155,13 @@ driver.callbackQuery(/^d:t:(\d+)$/, (ctx) => tripScreen(ctx, num(ctx)));
 driver.callbackQuery(/^d:sh:(\d+)$/, async (ctx) => {
   const trip = await getTrip(num(ctx));
   if (!trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
-  if (trip.status !== 'published' || trip.seatsFree === 0) return toast(ctx, t('share-not-available'), true);
+  if (!canShare(trip)) return toast(ctx, t('share-not-available'), true);
   const link = tripShareLink(trip.id);
   if (!link) return toast(ctx, t('action-not-available'), true);
   await ctx.answerCallbackQuery();
+  // Сначала само объявление — его можно переслать или скопировать в WhatsApp и VK; номер водитель допишет сам.
   await send(ctx.chat!.id, esc(shareText(trip, link)));
-  await send(
-    ctx.chat!.id,
-    t('share-hint'),
-    kb([[{ text: t('btn-share-to-chat'), url: shareUrl(trip, link) }], [{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]),
-  );
+  await send(ctx.chat!.id, t('share-hint'), kb([...shareRows(trip, link), [{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]));
 });
 
 driver.callbackQuery(/^d:go:(\d+)$/, async (ctx) => {
