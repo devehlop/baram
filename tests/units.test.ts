@@ -12,6 +12,14 @@ import { refreshChannelPost } from '../src/services/channel.js';
 import { setChannel } from '../src/services/directions.js';
 import { approvedDriver, postTrip, setup, type Harness } from './helpers.js';
 
+describe('тексты', () => {
+  it('подписи кнопок — в одну строку (многострочный текст не «перетёк» в кнопку)', () => {
+    const keys = [...readFileSync('locales/ru.ftl', 'utf8').matchAll(/^(btn-[\w-]+|menu-[\w-]+)\s*=/gm)].map((m) => m[1]!);
+    expect(keys.length).toBeGreaterThan(30);
+    for (const k of keys) expect(t(k, { n: 1, route: 'А → Б', time: '17:00', city: 'Буинск' }), k).not.toContain('\n');
+  });
+});
+
 describe('разбор ввода', () => {
   it('время, как его набирают люди', () => {
     expect(parseTime('17:30')).toBe(17 * 60 + 30);
