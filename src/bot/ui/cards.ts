@@ -1,10 +1,11 @@
 import type { TimeKind } from '../../db/schema.js';
 import { t } from '../../i18n.js';
-import { esc, fmtPhone, money } from '../../lib/format.js';
+import { esc, fmtPhone, fmtStars, money } from '../../lib/format.js';
 import { dayKey, fmtDateTime, fmtDayKey, fmtDayShort, fmtMinutes, fmtTime } from '../../lib/time.js';
 import type { BookingView, Place } from '../../services/bookings.js';
 import type { ComplaintView } from '../../services/complaints.js';
 import type { DriverView } from '../../services/drivers.js';
+import type { RatingSummary } from '../../services/ratings.js';
 import type { RequestView } from '../../services/requests.js';
 import type { TripView } from '../../services/trips.js';
 
@@ -30,11 +31,22 @@ export function timeLabel(day: string, kind: TimeKind, exactMinutes: number | nu
   return `${fmtDayKey(day)}, ${when}`;
 }
 
-/** Короткая подпись рейса для кнопки: «17:00 · Ильдар · 500 ₽». */
+/** «★ 4,8 · 12 оценок». */
+export function ratingLine(r: RatingSummary): string {
+  return t('rating-line', { avg: fmtStars(r.avg), n: r.count });
+}
+
+/** Для админа и самого человека: рейтинг даже при малом числе оценок. */
+export function ratingOrNone(r: RatingSummary): string {
+  return r.count > 0 ? ratingLine(r) : t('rating-none');
+}
+
+/** Короткая подпись рейса для кнопки: «17:00 · Ильдар ★4,8 · 500 ₽». */
 export function tripButton(trip: TripView, withDay: boolean): string {
   const time = fmtTime(trip.departsAt);
   const when = withDay ? `${fmtDayShort(dayKey(trip.departsAt))} ${time}` : time;
-  return `${when} · ${trip.driver.name} · ${money(trip.price)}`;
+  const stars = trip.driver.rating ? ` ★${fmtStars(trip.driver.rating.avg)}` : '';
+  return `${when} · ${trip.driver.name}${stars} · ${money(trip.price)}`;
 }
 
 export interface TripCardOptions {
@@ -53,7 +65,7 @@ export function tripCard(trip: TripView, o: TripCardOptions = {}): string {
   return lines([
     `<b>${esc(trip.route)}</b>`,
     `🕔 ${fmtDateTime(trip.departsAt)}`,
-    !o.own && `👤 ${esc(d.name)}${d.badge ? ` · ${t('badge-verified')}` : ''}`,
+    !o.own && `👤 ${esc(d.name)}${d.badge ? ` · ${t('badge-verified')}` : ''}${d.rating ? ` · ${ratingLine(d.rating)}` : ''}`,
     !o.own && `🚘 ${carLine(d)}${o.full ? ` · <b>${esc(d.plate)}</b>` : ''}`,
     !o.own && o.full && `📞 ${fmtPhone(d.phone)}`,
     `💺 ${t('trip-seats', { free: trip.seatsFree, total: trip.seatsTotal })}`,
@@ -85,6 +97,8 @@ export function baggageLine(b: Pick<BookingView, 'baggage' | 'baggageNote'>): st
 export interface PassengerMarks {
   completed: number;
   noShows: number;
+  /** Оценки от водителей; показываются, если их не меньше порога. */
+  rating?: RatingSummary | null;
 }
 
 /** Бронь глазами водителя. */
@@ -100,6 +114,7 @@ export function bookingForDriver(b: BookingView, marks?: PassengerMarks): string
     `<b>${esc(b.passengerName ?? '')}</b> · ${t('seats-count', { n: b.seats })}`,
     marks && marks.completed === 0 && `🆕 ${t('mark-new-passenger')}`,
     marks && marks.completed >= 3 && marks.noShows === 0 && `⭐ ${t('mark-reliable-passenger')}`,
+    marks?.rating && `${t('label-passenger-rating')}: ${ratingLine(marks.rating)}`,
     alone && `⚠️ ${t(`mark-alone-${b.passengerType}`)}`,
     b.isSelf || !b.booker
       ? `📞 ${fmtPhone(b.passengerPhone)}`
@@ -131,7 +146,7 @@ export function bookingForPassenger(b: BookingView, trip: TripView, prepayAmount
     b.comment && `💬 ${esc(b.comment)}`,
     `💰 ${money(b.price)}`,
     '',
-    `👤 ${t('label-driver')}: ${esc(d.name)}${d.badge ? ` · ${t('badge-verified')}` : ''}`,
+    `👤 ${t('label-driver')}: ${esc(d.name)}${d.badge ? ` · ${t('badge-verified')}` : ''}${d.rating ? ` · ${ratingLine(d.rating)}` : ''}`,
     `🚘 ${carLine(d)}${accepted ? ` · <b>${esc(d.plate)}</b>` : ''}`,
     accepted && `📞 ${fmtPhone(d.phone)}`,
     accepted && b.prepayRequired && !b.prepayReceived && b.status !== 'completed'
@@ -174,10 +189,11 @@ export function requestCard(r: RequestView, o: { showPhone?: boolean } = {}): st
   ]);
 }
 
-export function driverCard(d: DriverView, o: { admin?: boolean } = {}): string {
+export function driverCard(d: DriverView, o: { admin?: boolean; rating?: RatingSummary } = {}): string {
   return lines([
     `<b>${esc(d.fullName)}</b>`,
     o.admin && `${t('label-in-bot')}: ${esc(d.name)}, ${fmtPhone(d.phone)}`,
+    o.rating && `${t('label-rating')}: ${ratingOrNone(o.rating)}`,
     `🚘 ${carLine(d)} · <b>${esc(d.plate)}</b>`,
     `💺 ${t('driver-seats', { n: d.seats })}`,
     `👶 ${t(d.childSeat ? 'driver-child-seat-yes' : 'driver-child-seat-no')}`,
@@ -200,4 +216,17 @@ export function complaintCard(c: ComplaintView): string {
     c.note && `📝 ${esc(c.note)}`,
     c.resolution && `✅ ${esc(c.resolution)}`,
   ]);
+}
+
+/**
+ * Пять звёзд в ряд, как в Яндекс Такси: нажатая звезда — оценка (третья = 3 ★).
+ * prefix — начало callback_data, например `p:rt:12`.
+ */
+export function starsRow(prefix: string): { text: string; data: string }[] {
+  return [1, 2, 3, 4, 5].map((n) => ({ text: '⭐', data: `${prefix}:${n}` }));
+}
+
+/** 4 → «★★★★☆». */
+export function starsText(stars: number): string {
+  return '★'.repeat(stars) + '☆'.repeat(5 - stars);
 }

@@ -43,6 +43,8 @@ export type TimeKind = 'morning' | 'day' | 'evening' | 'exact';
 export type RequestStatus = 'open' | 'taken' | 'closed' | 'cancelled' | 'expired';
 export type ComplaintKind = 'complaint' | 'wrong_person';
 export type ComplaintStatus = 'new' | 'in_progress' | 'resolved';
+/** Кого оценивают: водителя (оценивает пассажир) или пассажира (оценивает водитель). */
+export type RatingTarget = 'driver' | 'passenger';
 
 /** Все пользователи бота. Имя вводится вручную, телефон — только кнопкой «Поделиться номером». */
 export const users = pgTable('users', {
@@ -300,6 +302,32 @@ export const requests = pgTable(
   (t) => [index('requests_open').on(t.status, t.directionId)],
 );
 
+/**
+ * Оценка после поездки: 1–5 звёзд. Одна на бронь и сторону.
+ * Пассажира оценивает водитель, оценка привязана к заказчику брони.
+ */
+export const ratings = pgTable(
+  'ratings',
+  {
+    id: serial('id').primaryKey(),
+    bookingId: integer('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    target: text('target').$type<RatingTarget>().notNull(),
+    fromUserId: integer('from_user_id')
+      .notNull()
+      .references(() => users.id),
+    toUserId: integer('to_user_id')
+      .notNull()
+      .references(() => users.id),
+    stars: integer('stars').notNull(),
+    /** Что было не так — видит только админ. */
+    comment: text('comment'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('ratings_booking_target').on(t.bookingId, t.target), index('ratings_to').on(t.toUserId, t.target)],
+);
+
 export const complaints = pgTable(
   'complaints',
   {
@@ -358,5 +386,6 @@ export type TripRow = typeof trips.$inferSelect;
 export type BookingRow = typeof bookings.$inferSelect;
 export type RequestRow = typeof requests.$inferSelect;
 export type ComplaintRow = typeof complaints.$inferSelect;
+export type RatingRow = typeof ratings.$inferSelect;
 export type SavedAddressRow = typeof savedAddresses.$inferSelect;
 export type SavedPassengerRow = typeof savedPassengers.$inferSelect;

@@ -77,6 +77,8 @@ export interface Trip {
     badge: boolean;
     priority: boolean;
     photo: string | null;
+    /** Рейтинг водителя; null — оценок пока мало. */
+    rating: { avg: number; count: number } | null;
     // Открываются после подтверждения брони:
     plate?: string;
     phone?: string;

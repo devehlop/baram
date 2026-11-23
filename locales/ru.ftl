@@ -178,6 +178,14 @@ booking-rides = Едет
 booking-booked-by = Оформил
 mark-new-passenger = Новый пассажир
 mark-reliable-passenger = Надёжный пассажир
+rating-line = ★ { $avg } · { $n ->
+    [one] { $n } оценка
+    [few] { $n } оценки
+   *[many] { $n } оценок
+}
+rating-none = оценок пока нет
+label-rating = Рейтинг
+label-passenger-rating = Оценка пассажира
 mark-alone-teen = Подросток едет один
 mark-alone-child = Ребёнок едет один
 baggage-bag = только сумка или рюкзак
@@ -385,6 +393,8 @@ setting-trip_autoclose_hours = Закрыть рейс без «Доехали»
 setting-driver_late_cancel_hours = Поздняя отмена рейса водителем, часов
 setting-price_min = Минимальная цена места, ₽
 setting-price_max = Максимальная цена места, ₽
+setting-rating_min_count = Показывать рейтинг всем с, оценок
+setting-rating_alert_below = Сообщать админу, если рейтинг ниже
 setting-dispatcher_phone = Телефон диспетчера
 
 ## Дни и время
@@ -792,3 +802,38 @@ board-my-trip = Мой рейс
 board-find = 🔎 Забронировать на этот день
 board-open-app = 📱 Открыть в приложении
 board-empty-directions = Направлений пока нет.
+
+## Оценки после поездки
+
+rate-ask-driver = Как вам поездка с водителем { $name }? Нажмите на звезду: первая — плохо, пятая — отлично.
+rate-thanks = Спасибо за оценку: { $stars }
+rate-comment-ask =
+    Ваша оценка: { $stars }. Что было не так?
+
+    Напишите коротко — это увидит только администратор «Барам», водитель не узнает, кто написал.
+rate-thanks-bad = Спасибо, администратор разберётся. Такие оценки помогают нам следить за качеством поездок.
+rate-already = Эта поездка уже оценена.
+rate-yours = Ваша оценка водителю: { $stars }
+btn-rate-driver = ⭐ Оценить водителя
+drv-rate-ask = Оцените пассажиров — по желанию. Оценку увидят другие водители.
+btn-rate-passenger = ⭐ Оценить: { $name }
+drv-rate-passenger-ask = Как прошла поездка с пассажиром { $name }? Нажмите на звезду: первая — плохо, пятая — отлично.
+rate-saved = Оценка сохранена: { $stars }
+adm-driver-rating = Рейтинг водителя
+adm-bad-ratings = Последние плохие оценки
+adm-rating-no-comment = без комментария
+adm-rating-low-driver =
+    ⚠️ <b>Рейтинг водителя опустился ниже { $limit }</b>
+    { $name }, { $phone }
+    Сейчас: ★ { $avg } · оценок: { $n }
+adm-rating-low-passenger =
+    ⚠️ <b>Рейтинг пассажира опустился ниже { $limit }</b>
+    { $name }, { $phone }
+    Сейчас: ★ { $avg } · оценок: { $n }
+adm-rating-bad =
+    ⭐ <b>Плохая оценка водителю: { $stars } из 5</b>
+    Водитель: { $driver }, { $phone }
+    { $route }, { $when }
+    Оценил: { $from }, { $fromPhone }
+    💬 { $comment }
+    Рейтинг водителя: ★ { $avg } · оценок: { $n }

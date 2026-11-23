@@ -7,6 +7,7 @@ import { listPendingAdminBookings } from '../../services/bookings.js';
 import { getComplaint, listOpenComplaints, takeComplaint } from '../../services/complaints.js';
 import { cityOf, deactivateVillage, listDirections, listLocalities } from '../../services/directions.js';
 import { getDriver, grantPrivilege, listDriversByStatus, revokePrivilege } from '../../services/drivers.js';
+import { lowRatings, ratingOf } from '../../services/ratings.js';
 import { candidateDrivers, getRequest, listEscalatedRequests } from '../../services/requests.js';
 import { loadSettings, SETTING_KEYS } from '../../services/settings.js';
 import { getTrip } from '../../services/trips.js';
@@ -16,7 +17,7 @@ import { adminBookingDecision, closeRequestByAdmin, offerRequest, reviewDriver, 
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
 import { kb, type Btn } from '../tg.js';
-import { bookingForDriver, complaintCard, requestCard, timeLabel } from '../ui/cards.js';
+import { bookingForDriver, complaintCard, ratingOrNone, requestCard, starsText, timeLabel } from '../ui/cards.js';
 import { num, show, toast } from './shared.js';
 
 export const admin = new Composer<MyContext>();
@@ -246,10 +247,19 @@ async function userScreen(ctx: MyContext, userId: number): Promise<void> {
   if (!u) return toast(ctx, t('not-found'), true);
   const d = await getDriver(userId);
   const st = await userStats(userId);
+  const asPassenger = await ratingOf(userId, 'passenger');
+  const asDriver = d ? await ratingOf(userId, 'driver') : null;
+  const bad = d ? await lowRatings(userId, 'driver') : [];
   const text = [
     `<b>${esc(u.name)}</b> · ${fmtPhone(u.phone)}`,
     `Telegram ID: <code>${u.telegramId}</code>${u.username ? ` · @${esc(u.username)}` : ''}`,
     t('adm-user-stats', { completed: st.completed, noShows: st.noShows, lateCancels: st.lateCancels }),
+    `${t('label-passenger-rating')}: ${ratingOrNone(asPassenger)}`,
+    asDriver && `${t('adm-driver-rating')}: ${ratingOrNone(asDriver)}`,
+    bad.length > 0 &&
+      `${t('adm-bad-ratings')}:\n${bad
+        .map((r) => `${starsText(r.stars)} · ${esc(r.fromName)}, ${fmtDateTime(r.createdAt.toISOString())}${r.comment ? `\n  «${esc(cut(r.comment, 200))}»` : ''}`)
+        .join('\n')}`,
     `${t('adm-user-restriction')}: ${t(`restriction-${u.restriction}`)}${u.restrictionReason ? ` (${esc(u.restrictionReason)})` : ''}`,
     d
       ? `\n${t('label-driver')}: ${esc(d.car)}, ${esc(d.plate)} · ${t(`driver-status-${d.status}`)}\n${t('label-privileges')}: ${[d.badge && t('badge-verified'), d.priority && t('priv-priority')].filter(Boolean).join(', ') || t('adm-none')}`

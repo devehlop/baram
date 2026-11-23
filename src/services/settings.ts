@@ -24,7 +24,12 @@ export const NUMERIC_SETTINGS = {
   driver_late_cancel_hours: 3, // отмена рейса с бронями позже срока — сигнал админу
   price_min: 100,
   price_max: 5000,
+  rating_min_count: 3, // со скольких оценок рейтинг показывается всем
+  rating_alert_below: 4, // рейтинг опустился ниже — сообщаем админу (можно дробное, например 4.5)
 } as const;
+
+/** Настройки, где допустима дробная часть: «4,5» → 4.5. */
+export const DECIMAL_SETTINGS: ReadonlySet<string> = new Set(['rating_alert_below']);
 
 export const TEXT_SETTINGS = {
   dispatcher_phone: '', // телефон диспетчера для кнопки «Помощь»

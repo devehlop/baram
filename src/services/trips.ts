@@ -18,6 +18,7 @@ import {
 import { addDays, dayEnd, dayKey, dayStart, now, todayKey } from '../lib/time.js';
 import { cityOf, otherSide, routeLabel } from './directions.js';
 import { activePrivileges } from './drivers.js';
+import { ratingsOf, type RatingSummary } from './ratings.js';
 import { loadSettings } from './settings.js';
 
 export interface TripInput {
@@ -69,6 +70,8 @@ export interface TripView {
     photo: string | null;
     badge: boolean;
     priority: boolean;
+    /** Рейтинг водителя; null — оценок пока меньше порога из настроек. */
+    rating: RatingSummary | null;
   };
 }
 
@@ -88,7 +91,14 @@ function baseSelect() {
 }
 
 export async function toTripViews(rows: Joined[]): Promise<TripView[]> {
-  const privs = await activePrivileges([...new Set(rows.map((r) => r.u.id))]);
+  const ids = [...new Set(rows.map((r) => r.u.id))];
+  const privs = await activePrivileges(ids);
+  const marks = ids.length ? await ratingsOf(ids, 'driver') : new Map<number, RatingSummary>();
+  const minCount = ids.length ? (await loadSettings()).rating_min_count : 0;
+  const shown = (id: number) => {
+    const r = marks.get(id);
+    return r && r.count >= Math.max(1, minCount) ? r : null;
+  };
   return rows.map(({ t, dir, d, u }) => ({
     id: t.id,
     driverId: t.driverId,
@@ -123,6 +133,7 @@ export async function toTripViews(rows: Joined[]): Promise<TripView[]> {
       photo: d.carPhotos[0] ?? null,
       badge: privs.get(u.id)?.has('verified_badge') ?? false,
       priority: privs.get(u.id)?.has('priority') ?? false,
+      rating: shown(u.id),
     },
   }));
 }

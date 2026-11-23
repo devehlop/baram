@@ -10,7 +10,8 @@ import {
 } from '../../services/bookings.js';
 import { tripShareLink } from '../../services/links.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../../services/trips.js';
-import { setActiveRole, userStats } from '../../services/users.js';
+import { passengerMarks, ratedBookings, ratingOf } from '../../services/ratings.js';
+import { setActiveRole } from '../../services/users.js';
 import {
   acceptBookingAction,
   cancelByDriver,
@@ -23,12 +24,13 @@ import {
   phoneBookingAction,
   pickUpAction,
   prepaidAction,
+  rateAction,
   wrongPersonAction,
 } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
 import { kb, send, type Btn } from '../tg.js';
-import { bookingForDriver, driverCard, tripCard } from '../ui/cards.js';
+import { bookingForDriver, driverCard, starsRow, starsText, tripCard } from '../ui/cards.js';
 import { canShare, shareRows, shareText } from '../ui/share.js';
 import { showMenu } from '../ui/menu.js';
 import { num, requireDriver, show, toast } from './shared.js';
@@ -91,7 +93,7 @@ export async function driverData(ctx: MyContext): Promise<void> {
   if (!d) return;
   await show(
     ctx,
-    driverCard(d),
+    driverCard(d, { rating: await ratingOf(d.userId, 'driver') }),
     kb([
       [d.status === 'photos_requested' && { text: t('btn-send-photos'), data: 'd:photos' }],
       [{ text: t('btn-edit-form'), data: 'd:form' }],
@@ -173,7 +175,43 @@ driver.callbackQuery(/^d:go:(\d+)$/, async (ctx) => {
 driver.callbackQuery(/^d:done:(\d+)$/, async (ctx) => {
   const ok = await completeTripAction(num(ctx), ctx.user!.id);
   if (!ok) return toast(ctx, t('not-found'), true);
-  await show(ctx, t('drv-trip-completed'), kb([[{ text: t('btn-to-my-trips'), data: 'd:trips' }]]));
+  await rateListScreen(ctx, num(ctx), t('drv-trip-completed'));
+});
+
+/** После «Доехали»: водитель может оценить пассажиров — по желанию, кнопкой на каждого. */
+async function rateListScreen(ctx: MyContext, tripId: number, title: string): Promise<void> {
+  const trip = await getTrip(tripId);
+  if (!trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
+  const done = (await listTripBookings(tripId, ['completed'])).filter((b) => b.source !== 'phone' && b.booker);
+  const rated = await ratedBookings(done.map((b) => b.id), 'passenger');
+  const left = done.filter((b) => !rated.has(b.id));
+  await show(
+    ctx,
+    left.length ? `${title}\n\n${t('drv-rate-ask')}` : title,
+    kb([
+      ...left.map((b) => [{ text: cut(t('btn-rate-passenger', { name: b.booker!.name }), 60), data: `d:rt:${b.id}` }]),
+      [{ text: t('btn-to-my-trips'), data: 'd:trips' }],
+    ]),
+  );
+}
+
+driver.callbackQuery(/^d:rt:(\d+)$/, async (ctx) => {
+  const b = await getBooking(num(ctx));
+  const trip = b && (await getTrip(b.tripId));
+  if (!b || !trip || trip.driverId !== ctx.user!.id || !b.booker) return toast(ctx, t('not-found'), true);
+  await show(
+    ctx,
+    t('drv-rate-passenger-ask', { name: esc(b.booker.name) }),
+    kb([starsRow(`d:rt:${b.id}`), [{ text: t('btn-back'), data: `d:rts:${trip.id}` }]]),
+  );
+});
+driver.callbackQuery(/^d:rts:(\d+)$/, (ctx) => rateListScreen(ctx, num(ctx), t('drv-trip-completed')));
+driver.callbackQuery(/^d:rt:(\d+):([1-5])$/, async (ctx) => {
+  const b = await getBooking(num(ctx));
+  if (!b) return toast(ctx, t('not-found'), true);
+  const res = await rateAction({ bookingId: b.id, target: 'passenger', fromUserId: ctx.user!.id, stars: num(ctx, 2) });
+  if (!res.ok && res.reason !== 'already') return toast(ctx, t('not-found'), true);
+  await rateListScreen(ctx, b.tripId, res.ok ? t('rate-saved', { stars: starsText(num(ctx, 2)) }) : t('rate-already'));
 });
 
 driver.callbackQuery(/^d:tc:(\d+)$/, async (ctx) => {
@@ -214,7 +252,7 @@ async function bookingScreen(ctx: MyContext, bookingId: number): Promise<void> {
   const b = await getBooking(bookingId);
   const trip = b && (await getTrip(b.tripId));
   if (!b || !trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
-  const marks = b.booker ? await userStats(b.booker.id) : undefined;
+  const marks = b.booker ? await passengerMarks(b.booker.id) : undefined;
   const rows: (Btn | false | null)[][] = [];
   const waiting = b.status === 'accepted' || b.status === 'confirmed';
   if (b.status === 'pending') {
