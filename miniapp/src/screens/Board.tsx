@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Chip, ErrorNote, Loading, PageHeader, Screen, TripCard } from '../components';
+import { Avatar, Button, Chip, ErrorNote, Loading, PageHeader, Screen, TripCard } from '../components';
 import { BAGGAGE, minutesLabel, seats } from '../format';
 import { errorText, useLoad, useNav } from '../nav';
 import { Rosette } from '../Ornaments';
@@ -115,7 +115,13 @@ export function Board(props: { initialRoute?: string; initialDay?: string; initi
                   <div className="trip__top">
                     <div className="trip__time" style={{ fontSize: 24 }}>{when(r)}</div>
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>{place(r.fromCity, r.fromVillage)} → {place(r.toCity, r.toVillage)}</div>
+                  <div className="row">
+                    <Avatar name={r.name} src={r.avatar ? `/requests/${r.id}/avatar` : null} />
+                    <div>
+                      <div className="person__name">{r.name}</div>
+                      <div className="person__sub">{place(r.fromCity, r.fromVillage)} → {place(r.toCity, r.toVillage)}</div>
+                    </div>
+                  </div>
                   <div className="chips">
                     <Chip>{seats(r.seats)}</Chip>
                     <Chip>{BAGGAGE[r.baggage]}</Chip>
@@ -134,7 +140,7 @@ export function Board(props: { initialRoute?: string; initialDay?: string; initi
                   <p className="muted">На этот день заявок нет</p>
                 </div>
               )}
-              <p className="small muted">Имена, телефоны и адреса пассажиров видит только водитель, который взял заявку.</p>
+              <p className="small muted">Телефоны и адреса пассажиров видит только водитель, который взял заявку.</p>
             </>
           )}
 

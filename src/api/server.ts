@@ -28,9 +28,10 @@ import { log } from '../logger.js';
 import { getBooking, listTripBookings, listUserBookings, type BookingView } from '../services/bookings.js';
 import { getLocality, listDirections, listLocalities, routeLabel } from '../services/directions.js';
 import { driverDirectionIds, getDriver } from '../services/drivers.js';
-import { listOpenRequestsForDriver, listUserOpenRequests } from '../services/requests.js';
+import { getRequest, listOpenRequestsForDriver, listUserOpenRequests } from '../services/requests.js';
 import { listAddresses, listPassengers, savePassenger } from '../services/saved.js';
-import { listRoutes, openRequests, openTrips } from '../services/board.js';
+import { listRoutes, openRequests, openTrips, requestForSelf } from '../services/board.js';
+import { getAvatar, getImage, type Image } from '../services/photos.js';
 import { searchTrips } from '../services/search.js';
 import { loadSettings } from '../services/settings.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../services/trips.js';
@@ -47,18 +48,24 @@ export interface ApiOptions {
 
 type Env = { Variables: { tgId: number; user: UserRow } };
 
-/** Рейс для пассажира до подтверждения брони: без госномера, телефона и реквизитов. */
+/** Рейс для пассажира до подтверждения брони: без госномера, телефона и реквизитов. Фото машины — только их число. */
 function publicTrip(t: TripView) {
-  const { phone: _p, plate: _pl, payPhone: _pp, payBank: _pb, telegramId: _tg, fullName: _fn, ...driver } = t.driver;
-  return { ...t, driver };
+  const { phone: _p, plate: _pl, payPhone: _pp, payBank: _pb, telegramId: _tg, fullName: _fn, photos, ...driver } = t.driver;
+  return { ...t, driver: { ...driver, photoCount: photos.length } };
 }
 
 /** Рейс для пассажира с бронью: после «Принять» открываются номер машины, телефон и реквизиты. */
 function tripForBooking(t: TripView, b: BookingView) {
   const accepted = ['accepted', 'confirmed', 'picked_up', 'completed'].includes(b.status);
   if (!accepted) return publicTrip(t);
-  const { telegramId: _tg, ...driver } = t.driver;
-  return { ...t, driver };
+  const { telegramId: _tg, photos, ...driver } = t.driver;
+  return { ...t, driver: { ...driver, photoCount: photos.length } };
+}
+
+/** Картинка в ответ: байты из Telegram. Ссылку на файл не отдаём — в ней токен бота. */
+function imageResponse(img: Image | null): Response {
+  if (!img) return Response.json({ error: 'not_found' }, { status: 404 });
+  return new Response(img.bytes, { headers: { 'content-type': img.type, 'cache-control': 'private, max-age=3600' } });
 }
 
 const place = z.object({
@@ -188,7 +195,7 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     return c.json({ exact: res.exact.map(publicTrip), near: res.near.map(publicTrip) });
   });
 
-  // ——— Доска: открытые рейсы и заявки на день. Видна всем, заявки — без имён, телефонов и адресов. ———
+  // ——— Доска: открытые рейсы и заявки на день. Видна всем, у заявок — имя пассажира, без телефонов и адресов. ———
   api.get('/api/board', async (c) => {
     const s = await loadSettings();
     const routes = await listRoutes();
@@ -201,6 +208,27 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     const q = { directionId: route.directionId, fromSide: route.fromSide, day };
     const [trips, requests] = await Promise.all([openTrips(q), openRequests(q)]);
     return c.json({ routes, days, route, day, trips: trips.map(publicTrip), requests });
+  });
+
+  // ——— Картинки: фото машины и фото профиля Telegram. Mini App грузит их с той же подписью initData. ———
+
+  // Фото машины видны всем, кто видит рейс: пассажир заранее знает, на чём поедет.
+  api.get('/api/trips/:id/photos/:n', async (c) => {
+    const trip = await getTrip(Number(c.req.param('id')));
+    const fileId = trip?.driver.photos[Number(c.req.param('n'))];
+    return imageResponse(fileId ? await getImage(fileId) : null);
+  });
+
+  api.get('/api/trips/:id/avatar', async (c) => {
+    const trip = await getTrip(Number(c.req.param('id')));
+    return imageResponse(trip ? await getAvatar(trip.driver.telegramId) : null);
+  });
+
+  // Фото профиля пассажира — только у открытой заявки и только если он едет сам, а не кто-то за него.
+  api.get('/api/requests/:id/avatar', async (c) => {
+    const r = await getRequest(Number(c.req.param('id')));
+    const ok = r && (r.status === 'open' || r.user.id === c.get('user').id) && requestForSelf(r);
+    return imageResponse(ok ? await getAvatar(r.user.telegramId) : null);
   });
 
   /** Пассажир из тела запроса: сам пользователь или другой человек (имя и телефон проверяются). */

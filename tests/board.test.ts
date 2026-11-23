@@ -30,7 +30,7 @@ async function requestTomorrow(tgId: number) {
 }
 
 describe('доска: все рейсы и заявки', () => {
-  it('рейсы и заявки по дням и направлениям в одном сообщении, заявки — без личных данных', async () => {
+  it('рейсы и заявки по дням и направлениям в одном сообщении, у заявок — имя без телефона и адреса', async () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     await approvedDriver(h, 202, 'Рамиль', '+79170000003', { plate: 'В222ВВ116' });
     await passenger(h, 101, 'Айгуль', '+79170000002');
@@ -58,8 +58,7 @@ describe('доска: все рейсы и заявки', () => {
     await v.press('Завтра ▶');
     await v.press('🙋 Ищут попутку');
     const text = v.last();
-    expect(text).toContain('<b>утром</b> · Буинск → Казань · 2 места · чемодан · 👶');
-    expect(text).not.toContain('Айгуль');
+    expect(text).toContain('<b>утром</b> · Айгуль · Буинск → Казань · 2 места · чемодан · 👶');
     expect(text).not.toContain('917');
     expect(text).not.toContain('Ленина');
     // Пассажир заявку взять не может, а водитель — может, прямо с доски.
@@ -88,6 +87,34 @@ describe('доска: все рейсы и заявки', () => {
     await p.press('Оставить заявку');
     expect(p.last()).toContain('В какое время?');
     expect(p.last()).toContain('Буинск → Казань · завтра');
+  });
+
+  it('«📷 Фото машины» в карточке брони: фото приходят в чат, карточка встаёт под ними', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    const p = await passenger(h, 101, 'Айгуль', '+79170000002');
+    await postTrip(201, { time: '17:00' });
+
+    await p.text('📋 Доска');
+    await p.press('Еду: 17:00 · Ильдар');
+    await p.press('Буинск');
+    await p.text('ул. Ленина, 12');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    expect(p.last()).toContain('Проверьте и бронируйте');
+    const cardId = h.tg.of(101).at(-1)!.messageId;
+
+    await p.press('📷 Фото машины');
+    const chat = h.tg.of(101);
+    const album = chat.find((m) => m.photos > 0)!;
+    expect(album.photos).toBe(2);
+    // Карточка — последним сообщением, под фото, и это новое сообщение: старое убрано.
+    expect(chat.at(-1)!.text).toContain('Проверьте и бронируйте');
+    expect(chat.at(-1)!.messageId).toBeGreaterThan(album.messageId);
+    expect(chat.some((m) => m.messageId === cardId)).toBe(false);
+
+    await p.press('✅ Забронировать');
+    expect(p.all()).toContain('Ильдар');
+    expect(p.last()).not.toContain('Проверьте и бронируйте');
   });
 
   it('больше 10 заявок — листаются страницами в том же сообщении', async () => {

@@ -425,8 +425,16 @@ const steps: Step<SearchState>[] = [
         [btn(`📍 ${t('label-from')}`, s.fromIsPoint ? 'point' : 'from'), btn(`🏁 ${t('label-to')}`, 'to')],
         [btn(`💬 ${t(s.comment ? 'btn-comment-edit' : 'btn-comment-add')}`, 'comment'), ...(booking ? [btn(t('btn-other-trip'), 'other')] : [])],
       ];
+      // Фото машины из анкеты водителя: пассажир заранее видит, на чём поедет.
+      if (booking && s.trip!.driver.photos.length) rows.splice(1, 0, [btn(t('btn-car-photos'), 'photos')]);
       const a = await w.ask({ text: cardText(s), rows });
       if (a.kind !== 'btn') return nav(a) ?? 'back';
+      if (a.data === 'photos') {
+        const d = s.trip!.driver;
+        // Фото приходят отдельными сообщениями, а карточка встаёт под ними — бронировать можно сразу.
+        await w.photos(d.photos, `${d.name} · ${d.car}, ${d.carYear}, ${d.carColor.toLowerCase()}`);
+        return { goto: 'card' };
+      }
       if (a.data === 'other') {
         s.pinned = false;
         s.day ??= dayKey(s.trip!.departsAt);
