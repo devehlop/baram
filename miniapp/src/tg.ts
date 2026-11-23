@@ -9,6 +9,8 @@ interface BackButton {
 
 interface WebApp {
   initData: string;
+  initDataUnsafe?: { start_param?: string };
+  openTelegramLink?(url: string): void;
   ready(): void;
   expand(): void;
   close(): void;
@@ -56,4 +58,35 @@ export function closeToBot(): void {
   } catch {
     // вне Telegram закрывать нечего
   }
+}
+
+/**
+ * С какого экрана открыть приложение. Кнопка «Открыть в приложении» на доске в чате передаёт
+ * ?screen=board&route=1-a&day=2026-11-10, а ссылка t.me/<бот>?startapp=board — параметр запуска «board».
+ */
+export function startScreen(): { screen: string; route?: string; day?: string } | null {
+  const q = new URLSearchParams(window.location.search);
+  const screen = q.get('screen');
+  if (screen) return { screen, route: q.get('route') ?? undefined, day: q.get('day') ?? undefined };
+  const param = tg?.initDataUnsafe?.start_param;
+  if (!param) return null;
+  // board или board_1-a_2026-11-10 (в параметре запуска допустимы только буквы, цифры, _ и -).
+  const [name, route, day] = param.split('_');
+  return { screen: name!, route, day };
+}
+
+/** Открыть чат с ботом сразу на нужном экране (ссылка t.me/<бот>?start=…). */
+export function openBot(botUsername: string | null | undefined, start?: string): void {
+  if (!botUsername) return closeToBot();
+  const url = `https://t.me/${botUsername}${start ? `?start=${start}` : ''}`;
+  try {
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(url);
+      tg.close();
+      return;
+    }
+  } catch {
+    // старый Telegram — просто закроем приложение
+  }
+  window.location.href = url;
 }

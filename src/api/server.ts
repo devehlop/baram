@@ -30,6 +30,7 @@ import { getLocality, listDirections, listLocalities, routeLabel } from '../serv
 import { driverDirectionIds, getDriver } from '../services/drivers.js';
 import { listOpenRequestsForDriver, listUserOpenRequests } from '../services/requests.js';
 import { listAddresses, listPassengers, savePassenger } from '../services/saved.js';
+import { listRoutes, openRequests, openTrips } from '../services/board.js';
 import { searchTrips } from '../services/search.js';
 import { loadSettings } from '../services/settings.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../services/trips.js';
@@ -185,6 +186,21 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     if (!route) return c.json({ error: 'no_route' }, 400);
     const res = await searchTrips({ ...route, ...q, excludeDriverId: c.get('user').id });
     return c.json({ exact: res.exact.map(publicTrip), near: res.near.map(publicTrip) });
+  });
+
+  // ——— Доска: открытые рейсы и заявки на день. Видна всем, заявки — без имён, телефонов и адресов. ———
+  api.get('/api/board', async (c) => {
+    const s = await loadSettings();
+    const routes = await listRoutes();
+    const days = dayOptions(s.trip_horizon_days);
+    const [dir, side] = (c.req.query('route') ?? '').split('-');
+    const route = routes.find((r) => String(r.directionId) === dir && r.fromSide === side) ?? routes[0] ?? null;
+    const wanted = c.req.query('day');
+    const day = days.find((d) => d.day === wanted)?.day ?? days[0]!.day;
+    if (!route) return c.json({ routes, days, route, day, trips: [], requests: [] });
+    const q = { directionId: route.directionId, fromSide: route.fromSide, day };
+    const [trips, requests] = await Promise.all([openTrips(q), openRequests(q)]);
+    return c.json({ routes, days, route, day, trips: trips.map(publicTrip), requests });
   });
 
   /** Пассажир из тела запроса: сам пользователь или другой человек (имя и телефон проверяются). */

@@ -17,44 +17,54 @@ beforeEach(async () => {
 });
 afterEach(() => h.close());
 
-/** Пассажир проходит анкету до списка рейсов. */
-async function searchTo(p: TestUser, o: { day?: string; time?: string; fromCity?: string; toCity?: string; village?: string } = {}) {
+/** Пассажир доходит до списка рейсов: куда → когда. */
+async function searchTo(p: TestUser, o: { day?: string; route?: string } = {}) {
   await p.text('🚗 Найти поездку');
-  await p.press('Я сам');
+  await p.press(o.route ?? 'Буинск → Казань');
+  await p.press(o.day ?? 'Сегодня');
+}
+
+/** Откуда забрать и куда отвезти: город (или деревня) и адрес. */
+async function places(p: TestUser, o: { village?: string } = {}) {
   if (o.village) {
     await p.press('Деревня или село');
     await p.press(o.village);
   } else {
-    await p.press(o.fromCity ?? 'Буинск');
+    await p.press('Буинск');
   }
   await p.text('ул. Ленина, 12');
-  await p.press(o.toCity ?? 'Казань');
+  await p.press('Казань');
   await p.text('ул. Деловая, 7');
-  await p.press(o.day ?? 'Сегодня');
-  await p.press(o.time ?? 'Вечером');
-  await p.press('1');
-  await p.press('Нет');
-  await p.press('Только сумка');
-  await p.press('Пропустить');
+}
+
+/** Рейса нет → заявка: время, откуда, куда, карточка → «Отправить». */
+async function leaveRequest(p: TestUser, time = 'Вечером') {
+  await p.press('Оставить заявку');
+  await p.press(time);
+  await places(p);
+  expect(p.last()).toContain('Заявка водителям');
+  await p.press('Отправить заявку');
 }
 
 describe('гибкий поиск', () => {
-  it('нет рейса на это время — показывает ближайшие, а не «ничего не найдено»', async () => {
-    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+  it('на этот день рейсов нет — подсказываем ближайший день и даём перелистнуть', async () => {
     await approvedDriver(h, 202, 'Рамиль', '+79170000003', { plate: 'В222ВВ116', childSeat: true });
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
-    await postTrip(201, { time: '20:00' });
     await postTrip(202, { time: '07:00', dayOffset: 1, villages: true });
-    await postTrip(202, { time: '18:00', dayOffset: 3 }); // далеко — не показываем
+    await postTrip(202, { time: '18:00', dayOffset: 3 });
 
-    await searchTo(p, { time: 'Днём' });
-    expect(p.last()).toContain('Точно на это время рейса нет. Ближайшие рейсы');
-    expect(p.last()).toContain('вт, 10 ноября в 20:00');
+    await searchTo(p);
+    expect(p.last()).toContain('На этот день рейсов пока нет');
+    expect(p.last()).toContain('Ближайшие рейсы — Завтра: 1');
+    expect(p.buttons()).toContain('🔔 Оставить заявку');
+    await p.press('Показать: Завтра');
     expect(p.last()).toContain('ср, 11 ноября в 07:00');
     expect(p.last()).not.toContain('13 ноября');
-    expect(p.buttons()).toContain('🔔 Оставить заявку');
-    // У рейса в другой день подпись кнопки с датой.
-    expect(p.buttons().some((b) => b.startsWith('Ср 11.11 07:00 · Рамиль'))).toBe(true);
+    // Дни листаются стрелками, не возвращаясь назад.
+    await p.press('▶');
+    expect(p.last()).toContain('На этот день рейсов пока нет');
+    await p.press('▶');
+    expect(p.last()).toContain('пт, 13 ноября в 18:00');
   });
 
   it('деревня: предупреждение о доплате и пометка у рейсов, которые в деревни не заезжают', async () => {
@@ -70,12 +80,19 @@ describe('гибкий поиск', () => {
     await admin.text('Альшеево');
     expect(admin.last()).toContain('Добавлено: Альшеево');
 
-    await searchTo(p, { village: 'Альшеево' });
-    expect(p.all()).toContain('За деревню может быть доплата');
+    await searchTo(p);
+    await p.press('18:00 · Ильдар');
+    await p.press('Деревня или село');
+    await p.press('Альшеево');
+    expect(p.last()).toContain('За деревню может быть доплата');
+    await p.text('ул. Центральная, 3');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    expect(p.last()).toContain('За деревню может быть доплата');
     expect(p.last()).toContain('В деревни не заезжает');
   });
 
-  it('свои точки сбора: пассажир выбирает точку водителя', async () => {
+  it('свои точки сбора: пассажир выбирает точку водителя, адрес «откуда» не нужен', async () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     const trip = await postTrip(201, { time: '18:00', pickupMode: 'points', pickupPoints: ['ТЦ Мега', 'Горки'] });
@@ -84,10 +101,35 @@ describe('гибкий поиск', () => {
     await p.press('18:00 · Ильдар');
     expect(p.last()).toContain('Где вам удобно сесть?');
     await p.press('Горки');
-    expect(p.last()).toContain('Точка сбора: Горки');
-    await p.press('Всё верно');
+    expect(p.last()).toContain('Куда вас отвезти?');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    expect(p.last()).toContain('Откуда: Буинск, Горки');
+    await p.press('Забронировать');
     expect(d.last()).toContain('Точка сбора: Горки');
     expect((await listTripBookings(trip.id))[0]!.pickupPoint).toBe('Горки');
+  });
+});
+
+describe('смешанная посадка', () => {
+  it('«От моего адреса» из карточки не спрашивает «куда» заново', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    const p = await passenger(h, 101, 'Айгуль', '+79170000002');
+    await postTrip(201, { time: '18:00', pickupMode: 'mixed', pickupPoints: ['ТЦ Мега'] });
+    await searchTo(p);
+    await p.press('18:00 · Ильдар');
+    await p.press('ТЦ Мега');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    expect(p.last()).toContain('Откуда: Буинск, ТЦ Мега');
+    // Передумала: «Откуда» → «От моего адреса» → адрес → сразу карточка.
+    await p.press('📍');
+    await p.press('От моего адреса');
+    await p.press('Буинск');
+    await p.text('ул. Ленина, 12');
+    expect(p.last()).toContain('Проверьте и бронируйте');
+    expect(p.last()).toContain('Откуда: Буинск, ул. Ленина, 12');
+    expect(p.last()).toContain('Куда: Казань, ул. Деловая, 7');
   });
 });
 
@@ -97,8 +139,8 @@ describe('заявки', () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
 
     await searchTo(p);
-    expect(p.last()).toContain('Рейсов на это время пока нет');
-    await p.press('Оставить заявку');
+    expect(p.last()).toContain('На этот день рейсов пока нет');
+    await leaveRequest(p);
     expect(p.fresh()).toContain('Заявка отправлена водителям');
     expect(p.fresh()).toContain('за 30 минут');
     expect(d.last()).toContain('Заявка от пассажира');
@@ -127,7 +169,7 @@ describe('заявки', () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await searchTo(p);
-    await p.press('Оставить заявку');
+    await leaveRequest(p);
     await postTrip(201, { time: '18:30' });
     await p.press('Еду с ним');
     expect(p.last()).toContain('Заявка на бронь отправлена водителю');
@@ -140,7 +182,7 @@ describe('заявки', () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await searchTo(p);
-    await p.press('Оставить заявку');
+    await leaveRequest(p);
 
     setClock('2026-11-10T06:20:00Z');
     await runJobs();
@@ -165,8 +207,8 @@ describe('заявки', () => {
 
   it('заявка, время которой прошло, закрывается сама', async () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
-    await searchTo(p, { time: 'Днём' });
-    await p.press('Оставить заявку');
+    await searchTo(p);
+    await leaveRequest(p, 'Днём');
     setClock('2026-11-10T17:00:00Z'); // 20:00 — окно «днём» ± 2 часа прошло
     await runJobs();
     expect(p.last()).toContain('Время вашей заявки прошло');
@@ -178,6 +220,7 @@ describe('админ в боте', () => {
     const admin = h.user(ADMIN_ID);
     const d = h.user(202);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Рамиль');
     await d.contact('+79170000009');
@@ -357,7 +400,10 @@ describe('устойчивость сценариев', () => {
   it('состояние анкеты переживает «перезапуск»: оно хранится в базе, а не в памяти', async () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await p.text('🚗 Найти поездку');
-    await p.press('Я сам');
+    await p.press('Буинск → Казань');
+    await p.press('Сегодня');
+    await p.press('Оставить заявку');
+    await p.press('Вечером');
     await p.press('Буинск');
     // Новый экземпляр бота на той же базе — как после перезапуска процесса.
     const { createBot } = await import('../src/bot/bot.js');
@@ -367,6 +413,6 @@ describe('устойчивость сценариев', () => {
     initApp({ db: h.db, api: bot2.api, adminIds: [ADMIN_ID] });
     h.bot = bot2;
     await p.text('ул. Ленина, 12');
-    expect(p.last()).toContain('Куда едете?');
+    expect(p.last()).toContain('Куда вас отвезти?');
   });
 });

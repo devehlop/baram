@@ -13,6 +13,8 @@ describe('регистрация', () => {
   it('пассажир: роль → имя → телефон кнопкой → главное меню', async () => {
     const u = h.user(101);
     await u.text('/start');
+    expect(u.last()).toContain('согласие на обработку персональных данных');
+    await u.press('Согласен');
     expect(u.last()).toContain('Вы едете как пассажир или вы водитель?');
     await u.press('Я пассажир');
     expect(u.last()).toContain('Как вас зовут?');
@@ -32,13 +34,25 @@ describe('регистрация', () => {
     await u.contact('89171234567');
     const user = await getUserByTg(101);
     expect(user).toMatchObject({ name: 'Айгуль', phone: '+79171234567', activeRole: 'passenger' });
-    expect(u.menu()).toEqual(['🚗 Найти поездку', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
+    expect(u.menu()).toEqual(['🚗 Найти поездку', '📋 Доска', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
+  });
+
+  it('без согласия дальше не пускает; политика доступна командой /privacy', async () => {
+    const u = h.user(104);
+    await u.text('/start');
+    await u.text('/privacy');
+    expect(u.last()).toContain('Политика обработки персональных данных');
+    expect(await getUserByTg(104)).toBeUndefined();
+    await u.text('/start');
+    await u.press('Согласен');
+    expect(u.last()).toContain('Вы едете как пассажир или вы водитель?');
   });
 
   it('водитель: после регистрации идёт анкета, она уходит админу', async () => {
     const d = h.user(202);
     const admin = h.user(ADMIN_ID);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Ильдар');
     await d.contact('+79170001122');
@@ -78,6 +92,7 @@ describe('регистрация', () => {
   it('«Назад» возвращает на предыдущий вопрос анкеты', async () => {
     const d = h.user(203);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Рамиль');
     await d.contact('+79170001133');

@@ -7,6 +7,7 @@ import { esc, money } from '../lib/format.js';
 import { fmtDayKey, fmtTime, now, todayKey } from '../lib/time.js';
 import { log } from '../logger.js';
 import { getDirection, routeLabel } from './directions.js';
+import { botLink, CHANNEL_SOURCE, tripChannelLink } from './links.js';
 import { tripsOfDay, type TripView } from './trips.js';
 
 function tripLine(trip: TripView): string {
@@ -16,9 +17,12 @@ function tripLine(trip: TripView): string {
     trip.villages && t('channel-villages'),
     trip.driver.childSeat && t('channel-child-seat'),
   ].filter(Boolean);
+  // Ссылка ведёт сразу на этот рейс в боте: «Еду с ним» без поиска.
+  const link = trip.seatsFree > 0 ? tripChannelLink(trip.id) : null;
   return [
     `<b>${fmtTime(trip.departsAt)}</b> · ${esc(trip.driver.name)} · ${esc(trip.driver.car)} · ${seats} · ${money(trip.price)}`,
     extra.length ? ` · ${extra.join(' · ')}` : '',
+    link ? ` · <a href="${link}">${t('channel-book-link')}</a>` : '',
   ].join('');
 }
 
@@ -53,9 +57,8 @@ export async function refreshChannelPost(directionId: number, day: string): Prom
     .where(and(eq(channelPosts.directionId, directionId), eq(channelPosts.day, day)));
   if (post?.lastText === text) return;
 
-  const markup = app.botUsername
-    ? new InlineKeyboard().url(t('channel-button'), `https://t.me/${app.botUsername}`)
-    : undefined;
+  const button = botLink(`s_${CHANNEL_SOURCE}`);
+  const markup = button ? new InlineKeyboard().url(t('channel-button'), button) : undefined;
   const options = { parse_mode: 'HTML' as const, link_preview_options: { is_disabled: true }, reply_markup: markup };
   try {
     if (post) {

@@ -175,6 +175,22 @@ export async function listOpenRequestsForDriver(driverId: number): Promise<Reque
   return rows.map(toView);
 }
 
+/** Открытые заявки на день по направлению и стороне — для общей доски. */
+export async function listOpenRequestsOn(directionId: number, fromSide: Side, day: string): Promise<RequestView[]> {
+  const rows = await select()
+    .where(
+      and(
+        eq(requests.status, 'open'),
+        eq(requests.directionId, directionId),
+        eq(requests.fromSide, fromSide),
+        eq(requests.day, day),
+        gt(requests.windowTo, now()),
+      ),
+    )
+    .orderBy(asc(requests.windowFrom));
+  return rows.map(toView);
+}
+
 export async function listUserOpenRequests(userId: number): Promise<RequestView[]> {
   const rows = await select()
     .where(and(eq(requests.userId, userId), eq(requests.status, 'open')))

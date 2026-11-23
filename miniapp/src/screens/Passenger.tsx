@@ -70,7 +70,7 @@ export function Home() {
       )}
 
       <div className="tiles">
-        <MenuTile primary icon="car" label="Найти поездку" onClick={() => go({ name: 'search' })} />
+        <MenuTile primary icon="car" label="Найти поездку" hint="все рейсы и заявки" onClick={() => go({ name: 'board' })} />
         <MenuTile icon="calendar" label="Мои поездки" onClick={() => go({ name: 'trips' })} />
         <MenuTile icon="phone" label="Помощь" onClick={() => go({ name: 'help' })} />
         {me.driver ? (
@@ -91,6 +91,20 @@ export function Home() {
         </button>
       )}
     </Screen>
+  );
+}
+
+/** Вход на доску: все рейсы и заявки — на главном экране и у пассажира, и у водителя. */
+export function BoardLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="card card--row" onClick={onClick}>
+      <span className="option__icon"><Icon name="list" size={26} /></span>
+      <span style={{ flex: 1 }}>
+        <span style={{ display: 'block', fontSize: 18, fontWeight: 700 }}>Доска</span>
+        <span className="small muted">Все рейсы водителей и заявки пассажиров</span>
+      </span>
+      <Icon name="chevron" />
+    </button>
   );
 }
 
@@ -141,7 +155,7 @@ export function MyTrips() {
       {!!data?.past.length && <div className="label-caps muted">Прошлые</div>}
       {data?.past.map(item)}
       <div className="spacer" />
-      <Button onClick={() => go({ name: 'search' })}>Найти поездку</Button>
+      <Button onClick={() => go({ name: 'board' })}>Найти поездку</Button>
     </Screen>
   );
 }

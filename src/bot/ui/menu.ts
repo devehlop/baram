@@ -8,6 +8,7 @@ import { send } from '../tg.js';
 /** Подписи кнопок главного меню. Нажатие приходит боту обычным текстом. */
 export const MENU_KEYS = [
   'menu-find',
+  'menu-board',
   'menu-my-trips',
   'menu-help',
   'menu-become-driver',
@@ -33,12 +34,12 @@ export async function mainKeyboard(user: UserRow): Promise<Keyboard> {
   if (user.activeRole === 'driver' && driver) {
     k.text(t('menu-post-trip')).row();
     k.text(t('menu-driver-trips')).text(t('menu-requests')).row();
-    k.text(t('menu-driver-data')).text(t('menu-help')).row();
-    k.text(t('menu-to-passenger'));
+    k.text(t('menu-board')).text(t('menu-driver-data')).row();
+    k.text(t('menu-help')).text(t('menu-to-passenger'));
   } else {
     k.text(t('menu-find')).row();
-    k.text(t('menu-my-trips')).text(t('menu-help')).row();
-    k.text(t(driver ? 'menu-to-driver' : 'menu-become-driver'));
+    k.text(t('menu-board')).text(t('menu-my-trips')).row();
+    k.text(t('menu-help')).text(t(driver ? 'menu-to-driver' : 'menu-become-driver'));
   }
   if (isAdminTg(user.telegramId)) k.row().text(t('menu-admin'));
   return k.resized().persistent();

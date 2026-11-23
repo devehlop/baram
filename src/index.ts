@@ -24,10 +24,14 @@ async function main(): Promise<void> {
   await clearConversations();
 
   await bot.init();
-  initApp({ db, api: bot.api, adminIds: config.adminIds, botUsername: bot.botInfo.username });
+  initApp({ db, api: bot.api, adminIds: config.adminIds, botUsername: bot.botInfo.username, miniappUrl: config.miniappUrl });
   await bot.api.setMyCommands([
     { command: 'start', description: t('cmd-start') },
+    { command: 'find', description: t('cmd-find') },
+    { command: 'board', description: t('cmd-board') },
+    { command: 'trips', description: t('cmd-trips') },
     { command: 'help', description: t('cmd-help') },
+    { command: 'privacy', description: t('cmd-privacy') },
   ]);
   if (config.adminIds.length === 0) log.warn('ADMIN_IDS пуст: проверять водителей некому. Узнать свой ID — команда /id.');
 

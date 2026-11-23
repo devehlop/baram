@@ -13,7 +13,7 @@ import { search } from './conversations/search.js';
 import { tripCreate } from './conversations/tripCreate.js';
 import { handlers } from './handlers/index.js';
 import { conversationStorage } from './storage.js';
-import { send } from './tg.js';
+import { noteIncoming, removeIncoming, send } from './tg.js';
 import { menuKeyOf } from './ui/menu.js';
 
 export function createBot(token: string, client?: ApiClientOptions): Bot<MyContext> {
@@ -30,6 +30,8 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
   const pm = bot.chatType('private');
 
   pm.use(async (ctx, next) => {
+    // Запоминаем порядок сообщений в чате: по нему «окно» решает, обновиться на месте или прийти заново.
+    if (ctx.message) noteIncoming(ctx.chat.id, ctx.message.message_id);
     ctx.user = ctx.from ? await getUserByTg(ctx.from.id) : undefined;
     ctx.isAdmin = isAdminTg(ctx.from?.id);
     if (ctx.user?.restriction === 'blocked' && !ctx.isAdmin) {
@@ -45,8 +47,11 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
   // Команда или кнопка главного меню всегда прерывает текущий сценарий: это «В начало».
   pm.use(async (ctx, next) => {
     const text = ctx.message?.text;
-    const interrupts = text !== undefined && (text.startsWith('/') || menuKeyOf(text) !== undefined);
+    const menu = menuKeyOf(text) !== undefined;
+    const interrupts = text !== undefined && (text.startsWith('/') || menu);
     if (interrupts) await ctx.conversation.exitAll();
+    // Нажатие большой кнопки меню приходит сообщением — убираем его, раздел откроется на месте прошлого экрана.
+    if (menu && ctx.message) await removeIncoming(ctx.chat.id, ctx.message.message_id);
     await next();
   });
 

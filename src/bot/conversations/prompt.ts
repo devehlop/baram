@@ -1,4 +1,4 @@
-import type { Context } from 'grammy';
+import type { Context, InlineKeyboard } from 'grammy';
 import { isAdminTg } from '../../app.js';
 import type { Side } from '../../db/schema.js';
 import { t } from '../../i18n.js';
@@ -97,7 +97,7 @@ function question(a: PromptArgs): Question {
 export async function prompt(conv: MyConversation, ctx: Context, args: PromptArgs): Promise<void> {
   const chatId = ctx.chat!.id;
   const telegramId = ctx.from!.id;
-  const w = new Wizard(conv, chatId);
+  const w = new Wizard(conv, chatId, ctx.callbackQuery?.message?.message_id);
   if (args.kind.startsWith('admin') && !isAdminTg(telegramId)) return;
 
   const q = question(args);
@@ -116,93 +116,102 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
   const text = a.kind === 'text' ? a.text : '';
   const button = a.kind === 'btn' ? a.data : null;
 
-  await w.ext(async () => {
+  // Ответ показывается в том же окне, где был вопрос.
+  const out = await w.ext(async (): Promise<{ text: string; markup?: InlineKeyboard } | null> => {
     const me = await getUserByTg(telegramId);
     // Админ может быть не зарегистрирован как пассажир: тогда действие записывается без автора.
     const adminId = me?.id ?? null;
-    const say = (msg: string, markup?: Parameters<typeof send>[2]) => send(chatId, msg, markup);
+    let result: { text: string; markup?: InlineKeyboard } | null = null;
+    const say = async (msg: string, markup?: InlineKeyboard) => {
+      result = { text: msg, markup };
+    };
+    await run();
+    return result;
 
-    switch (args.kind) {
-      case 'complaint': {
-        if (!me) return;
-        await fileComplaint({ fromUserId: me.id, bookingId: args.id ?? null, text });
-        await say(t('complaint-sent'));
-        return;
-      }
-      case 'phoneData': {
-        const b = await getBooking(args.id);
-        const trip = b && (await getTrip(b.tripId));
-        if (!me || !b || !trip || trip.driverId !== me.id) return void (await say(t('not-found')));
-        const data = a.kind === 'contact' ? { name: a.name || t('passenger-unknown'), phone: a.phone } : parseNamePhone(text);
-        if (!data) return void (await say(t('phone-data-hint')));
-        await setPhoneBookingData(args.id, data.name, data.phone);
-        await say(
-          t('phone-data-saved', { name: esc(data.name), phone: fmtPhone(data.phone) }),
-          kb([[{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]),
-        );
-        return;
-      }
-      case 'adminReject': {
-        const reason = button ? t(REJECT_REASONS[Number(button.slice(1))]!) : text;
-        await reviewDriver(args.id, adminId, 'reject', reason);
-        await say(t('adm-driver-rejected'));
-        return;
-      }
-      case 'adminSuspend': {
-        await reviewDriver(args.id, adminId, 'suspend', text);
-        await say(t('adm-driver-suspended'), kb([[{ text: t('btn-open'), data: `a:u:${args.id}` }]]));
-        return;
-      }
-      case 'adminBlock': {
-        const target = await getUser(args.id);
-        if (!target) return void (await say(t('not-found')));
-        await setRestriction(args.id, 'blocked', text);
-        await send(target.telegramId, t('blocked-message'), { remove_keyboard: true });
-        await say(t('adm-user-blocked'), kb([[{ text: t('btn-open'), data: `a:u:${args.id}` }]]));
-        return;
-      }
-      case 'adminSetting': {
-        if (!isSettingKey(args.key)) return;
-        await setSetting(args.key, text);
-        await say(t('adm-setting-saved', { name: t(`setting-${args.key}`), value: esc(text) }), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
-        return;
-      }
-      case 'adminFind': {
-        const found = await findUsers(text);
-        await say(
-          found.length ? t('adm-find-results') : t('adm-find-none'),
-          kb([
-            ...found.map((u) => [{ text: `${u.name} · ${fmtPhone(u.phone)}`, data: `a:u:${u.id}` }]),
-            [{ text: t('adm-menu-back'), data: 'a:menu' }],
-          ]),
-        );
-        return;
-      }
-      case 'adminVillage': {
-        await addVillage(args.id, args.side, text);
-        await say(t('adm-village-added', { name: esc(text) }), kb([[{ text: t('adm-villages'), data: 'a:vil' }]]));
-        return;
-      }
-      case 'adminChannel': {
-        await setChannel(args.id, button === 'off' ? null : text);
-        await say(t(button === 'off' ? 'adm-channel-disabled' : 'adm-channel-saved'), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
-        return;
-      }
-      case 'adminTravel': {
-        await setTravelMinutes(args.id, Number(text));
-        await say(t('done'), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
-        return;
-      }
-      case 'adminNote': {
-        await setComplaintNote(args.id, text);
-        await say(t('adm-note-saved'), kb([[{ text: t('btn-open'), data: `a:c:${args.id}` }]]));
-        return;
-      }
-      case 'adminResolve': {
-        await resolveComplaint(args.id, adminId, text);
-        await say(t('adm-complaint-resolved'), kb([[{ text: t('adm-complaints'), data: 'a:cmp' }]]));
-        return;
+    async function run(): Promise<void> {
+      switch (args.kind) {
+        case 'complaint': {
+          if (!me) return;
+          await fileComplaint({ fromUserId: me.id, bookingId: args.id ?? null, text });
+          await say(t('complaint-sent'));
+          return;
+        }
+        case 'phoneData': {
+          const b = await getBooking(args.id);
+          const trip = b && (await getTrip(b.tripId));
+          if (!me || !b || !trip || trip.driverId !== me.id) return void (await say(t('not-found')));
+          const data = a.kind === 'contact' ? { name: a.name || t('passenger-unknown'), phone: a.phone } : parseNamePhone(text);
+          if (!data) return void (await say(t('phone-data-hint')));
+          await setPhoneBookingData(args.id, data.name, data.phone);
+          await say(
+            t('phone-data-saved', { name: esc(data.name), phone: fmtPhone(data.phone) }),
+            kb([[{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]),
+          );
+          return;
+        }
+        case 'adminReject': {
+          const reason = button ? t(REJECT_REASONS[Number(button.slice(1))]!) : text;
+          await reviewDriver(args.id, adminId, 'reject', reason);
+          await say(t('adm-driver-rejected'));
+          return;
+        }
+        case 'adminSuspend': {
+          await reviewDriver(args.id, adminId, 'suspend', text);
+          await say(t('adm-driver-suspended'), kb([[{ text: t('btn-open'), data: `a:u:${args.id}` }]]));
+          return;
+        }
+        case 'adminBlock': {
+          const target = await getUser(args.id);
+          if (!target) return void (await say(t('not-found')));
+          await setRestriction(args.id, 'blocked', text);
+          await send(target.telegramId, t('blocked-message'), { remove_keyboard: true });
+          await say(t('adm-user-blocked'), kb([[{ text: t('btn-open'), data: `a:u:${args.id}` }]]));
+          return;
+        }
+        case 'adminSetting': {
+          if (!isSettingKey(args.key)) return;
+          await setSetting(args.key, text);
+          await say(t('adm-setting-saved', { name: t(`setting-${args.key}`), value: esc(text) }), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
+          return;
+        }
+        case 'adminFind': {
+          const found = await findUsers(text);
+          await say(
+            found.length ? t('adm-find-results') : t('adm-find-none'),
+            kb([
+              ...found.map((u) => [{ text: `${u.name} · ${fmtPhone(u.phone)}`, data: `a:u:${u.id}` }]),
+              [{ text: t('adm-menu-back'), data: 'a:menu' }],
+            ]),
+          );
+          return;
+        }
+        case 'adminVillage': {
+          await addVillage(args.id, args.side, text);
+          await say(t('adm-village-added', { name: esc(text) }), kb([[{ text: t('adm-villages'), data: 'a:vil' }]]));
+          return;
+        }
+        case 'adminChannel': {
+          await setChannel(args.id, button === 'off' ? null : text);
+          await say(t(button === 'off' ? 'adm-channel-disabled' : 'adm-channel-saved'), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
+          return;
+        }
+        case 'adminTravel': {
+          await setTravelMinutes(args.id, Number(text));
+          await say(t('done'), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
+          return;
+        }
+        case 'adminNote': {
+          await setComplaintNote(args.id, text);
+          await say(t('adm-note-saved'), kb([[{ text: t('btn-open'), data: `a:c:${args.id}` }]]));
+          return;
+        }
+        case 'adminResolve': {
+          await resolveComplaint(args.id, adminId, text);
+          await say(t('adm-complaint-resolved'), kb([[{ text: t('adm-complaints'), data: 'a:cmp' }]]));
+          return;
+        }
       }
     }
   });
+  if (out) await w.finish(out.text, out.markup);
 }

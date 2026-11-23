@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { api, ApiError } from '../api';
 import { Avatar, Button, Chip, ErrorNote, Icon, Loading, MenuTile, PageHeader, Screen } from '../components';
+import { BoardLink } from './Passenger';
 import { BAGGAGE, dateTime, mapsUrl, money, parseTime, phone, seats, time } from '../format';
 import { errorText, useLoad, useNav } from '../nav';
 import { Rosette, TulipBand } from '../Ornaments';
-import { closeToBot, haptic } from '../tg';
+import { haptic } from '../tg';
 import type { Booking, DriverHome, PickupMode, Trip, Trunk } from '../types';
 
 const DRIVER_STATUS: Record<string, string> = {
@@ -115,11 +116,13 @@ export function DriverHomeScreen() {
         </button>
       )}
 
+      <BoardLink onClick={() => go({ name: 'board' })} />
+
       <div className="tiles">
         <MenuTile primary icon="plus" label="Выложить рейс" hint={data.last ? 'или повторить' : undefined}
           onClick={() => go({ name: 'postTrip', repeat: !!data.last })} />
         <MenuTile icon="list" label="Мои рейсы" onClick={() => go({ name: 'driverTrips' })} />
-        <MenuTile icon="bell" label="Заявки" hint="в чате с ботом" count={data.openRequests} onClick={closeToBot} />
+        <MenuTile icon="bell" label="Заявки" hint="на доске" count={data.openRequests} onClick={() => go({ name: 'board', tab: 'requests' })} />
         <MenuTile icon="swap" label="Я пассажир" onClick={() => void toPassenger()} />
       </div>
     </Screen>

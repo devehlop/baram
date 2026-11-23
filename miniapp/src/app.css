@@ -207,3 +207,14 @@ textarea.input { height: 96px; padding: 12px 16px; resize: none; line-height: 1.
 .welcome__hi { font-size: 30px; font-weight: 600; line-height: 1.12; }
 .welcome__band { margin: 0 calc(-1 * var(--sp-5)); }
 .loading { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-4); padding: var(--sp-6); text-align: center; }
+
+/* Доска: вкладки, направления и дни */
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--c-surface-2); border-radius: var(--r-button); padding: 4px; }
+.segmented__item { min-height: var(--tap-min); border-radius: 14px; font-size: 16px; font-weight: 700; color: var(--c-ink-muted); background: transparent; }
+.segmented__item[aria-selected='true'] { background: var(--c-surface); color: var(--c-ink); box-shadow: 0 1px 0 var(--c-line); }
+.segmented__count { display: inline-block; min-width: 24px; margin-left: 4px; padding: 0 6px; border-radius: 12px; background: var(--c-line); font-size: 14px; }
+.segmented__item[aria-selected='true'] .segmented__count { background: var(--c-red); color: #FFFFFF; }
+.scroller { display: flex; gap: var(--sp-2); overflow-x: auto; margin: 0 calc(-1 * var(--page-x)); padding: 2px var(--page-x); scrollbar-width: none; }
+.scroller::-webkit-scrollbar { display: none; }
+.pill { flex-shrink: 0; min-height: var(--h-button-small); padding: 0 14px; border-radius: 22px; border: 2px solid var(--c-line); background: var(--c-surface); font-size: 16px; font-weight: 600; color: var(--c-ink); }
+.pill[aria-pressed='true'] { border-color: var(--c-red); background: var(--c-red); color: #FFFFFF; }

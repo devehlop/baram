@@ -72,6 +72,7 @@ describe('защита от спама при выкладке рейса', () =
   it('водителю без одобренной анкеты рейсы недоступны', async () => {
     const d = h.user(202);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Рамиль');
     await d.contact('+79170000009');
@@ -106,25 +107,25 @@ describe('бронь за другого, багаж, предоплата', () 
     const trip = await postTrip(201);
 
     await p.text('🚗 Найти поездку');
-    await p.press('Другой человек');
-    await p.text('гульнара');
-    await p.text('8 917 555-44-33');
-    await p.press('Подросток');
+    await p.press('Буинск → Казань');
+    await p.press('Сегодня');
+    await p.press('17:00 · Ильдар');
     await p.press('Буинск');
     await p.text('ул. Ленина, 12');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    await p.press('Сегодня');
-    await p.press('Вечером');
-    await p.press('1');
-    await p.press('Нет');
+    // В карточке: «Едет» → другой человек, багаж → много.
+    await p.press('👤');
+    await p.press('Другой человек');
+    await p.text('гульнара');
+    await p.text('8 917 555-44-33');
+    await p.press('Подросток');
+    await p.press('🧳');
     await p.press('Много багажа');
     await p.text('Три коробки с банками');
-    await p.press('Пропустить');
-    await p.press('17:00 · Ильдар');
     expect(p.last()).toContain('Едет: Гульнара, +7 917 555-44-33');
     expect(p.last()).toContain('предоплата 600 ₽');
-    await p.press('Всё верно');
+    await p.press('Забронировать');
 
     expect(d.last()).toContain('Едет: Гульнара (подросток 14–17), +7 917 555-44-33');
     expect(d.last()).toContain('Оформил: Данис, +7 917 000-00-02');
@@ -147,6 +148,10 @@ describe('бронь за другого, багаж, предоплата', () 
     // Человек запомнился — в следующий раз он отдельной кнопкой.
     expect(await listPassengers(await dbId(101))).toMatchObject([{ name: 'Гульнара', phone: '+79175554433', type: 'teen' }]);
     await p.text('🚗 Найти поездку');
+    await p.press('Как в прошлый раз');
+    await p.press('Сегодня');
+    await p.press('17:00 · Ильдар');
+    await p.press('👤');
     expect(p.buttons()).toContain('Гульнара');
   });
 
