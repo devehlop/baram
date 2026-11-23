@@ -20,6 +20,7 @@ afterEach(() => h.close());
 async function registerVia(id: number, payload: string, name = 'Айгуль') {
   const u = h.user(id, name);
   await u.text(`/start ${payload}`);
+  await u.press('Согласен');
   await u.press('Я пассажир');
   await u.text(name);
   await u.contact(`+79170000${id}`);
