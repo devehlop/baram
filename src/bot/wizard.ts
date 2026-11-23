@@ -1,14 +1,29 @@
 import type { Context } from 'grammy';
-import { Keyboard } from 'grammy';
-import { esc, normalizePhone } from '../lib/format.js';
+import { Keyboard, type InlineKeyboard } from 'grammy';
+import { normalizePhone } from '../lib/format.js';
 import { t } from '../i18n.js';
 import type { MyConversation } from './context.js';
-import { answerCb, clearKeyboard, edit, kb, send, type Markup } from './tg.js';
+import {
+  answerCb,
+  deleteMessage,
+  dropScreen,
+  edit,
+  isLastInChat,
+  kb,
+  markReceipt,
+  removeIncoming,
+  screenOf,
+  send,
+  setScreen,
+  type Btn,
+  type Markup,
+} from './tg.js';
 
 /** Кнопка варианта ответа. data — короткий код, без префикса. */
 export interface Opt {
   text: string;
   data: string;
+  style?: Btn['style'];
 }
 
 export interface AskOptions {
@@ -40,18 +55,33 @@ export type Answer =
 
 const PREFIX = 'w:';
 
+/** Как человек ответил на прошлый вопрос: от этого зависит, где обновлять окно. */
+type Via = 'start' | 'button' | 'message';
+
 /**
  * Обёртка над сценарием: задаёт вопрос, ждёт ответ кнопкой или сообщением,
  * добавляет «Назад» и «В начало».
+ *
+ * Весь сценарий идёт в одном «окне» — одном сообщении бота, которое меняется от шага к шагу.
+ * Нажал кнопку — окно обновляется на месте. Написал текст или прислал геопозицию — сообщение
+ * человека убираем, а окно обновляем (или присылаем заново внизу, если между ними что-то пришло).
  *
  * Плагин conversations при каждом новом сообщении проигрывает функцию сценария заново,
  * поэтому всё, что ходит в базу или в Telegram, идёт через ext(): результат запоминается
  * и при повторном проигрывании не выполняется второй раз.
  */
 export class Wizard {
+  /** id окна; null — окна ещё нет. Меняется только из результатов ext(), чтобы совпадать при повторном проигрывании. */
+  private panel: number | null = null;
+  private via: Via = 'start';
+  /** Пояснение (say), которое показывается над следующим вопросом. */
+  private notice: string | null = null;
+
   constructor(
     public readonly conv: MyConversation,
     public readonly chatId: number,
+    /** Сообщение, кнопкой в котором запустили сценарий: если это открытый экран, окно займёт его место. */
+    private readonly entryMessageId?: number,
   ) {}
 
   /** Выполнить один раз и запомнить результат. Результат должен быть простыми данными (без Date). */
@@ -62,10 +92,61 @@ export class Wizard {
     });
   }
 
+  /** Показать текст в окне. Вызывать только внутри ext(). */
+  private async paint(text: string, markup?: InlineKeyboard): Promise<number | null> {
+    const chat = this.chatId;
+    const id = this.panel ?? (this.entryMessageId && screenOf(chat) === this.entryMessageId ? this.entryMessageId : null);
+    if (id) {
+      // После нажатия кнопки человек смотрит на окно — меняем его на месте, где бы оно ни было.
+      const inPlace = this.via === 'button' || (this.via === 'start' && id === this.entryMessageId) || isLastInChat(chat, id);
+      if (inPlace && (await edit(chat, id, text, markup))) {
+        setScreen(chat, id);
+        return id;
+      }
+      await deleteMessage(chat, id);
+    } else {
+      // Новый сценарий: прошлый открытый экран больше не нужен.
+      await dropScreen(chat);
+    }
+    const fresh = await send(chat, text, markup);
+    setScreen(chat, fresh);
+    return fresh;
+  }
+
+  private withNotice(text: string): string {
+    const n = this.notice;
+    this.notice = null;
+    return n ? `${n}\n\n${text}` : text;
+  }
+
+  /**
+   * Пояснение по ходу сценария. Оно сразу видно в окне и остаётся над следующим вопросом.
+   * С клавиатурой (например, убрать кнопку «Поделиться номером») — отдельным сообщением.
+   */
   async say(text: string, markup?: Markup): Promise<void> {
+    if (markup) {
+      await this.ext(async () => {
+        await send(this.chatId, text, markup);
+      });
+      return;
+    }
+    this.notice = this.notice ? `${this.notice}\n\n${text}` : text;
+    const notice = this.notice;
+    this.panel = await this.ext(() => this.paint(notice));
+  }
+
+  /**
+   * Итог сценария (бронь, заявка): показывается в окне и остаётся в чате.
+   * Это уже не экран, а «квитанция» — переход в другой раздел её не удалит.
+   */
+  async finish(text: string, markup?: InlineKeyboard): Promise<void> {
+    const body = this.withNotice(text);
     await this.ext(async () => {
-      await send(this.chatId, text, markup);
+      const id = await this.paint(body, markup);
+      if (id && screenOf(this.chatId) === id) setScreen(this.chatId, null);
+      if (id) markReceipt(this.chatId, id);
     });
+    this.panel = null;
   }
 
   async ask(o: AskOptions): Promise<Answer> {
@@ -77,13 +158,35 @@ export class Wizard {
     const labels = new Map<string, string>();
     for (const row of rows) for (const b of row) labels.set(b.data, b.text);
 
-    const markup: Markup | undefined = o.shareContactButton
-      ? new Keyboard().requestContact(o.shareContactButton).resized().oneTime()
-      : rows.length
-        ? kb(rows.map((r) => r.map((b) => ({ text: b.text, data: PREFIX + b.data }))))
-        : undefined;
-    const hasInline = !o.shareContactButton && rows.length > 0;
-    const msgId = await this.ext(() => send(this.chatId, o.text, markup));
+    const text = this.withNotice(o.text);
+    const inline = rows.length
+      ? kb(rows.map((r) => r.map((b) => ({ text: b.text, data: PREFIX + b.data, style: b.style }))))
+      : undefined;
+
+    let msgId: number | null;
+    if (o.shareContactButton) {
+      // Кнопку «Поделиться номером» можно показать только в новом сообщении.
+      const markup = new Keyboard().requestContact(o.shareContactButton).resized().oneTime();
+      msgId = await this.ext(async () => {
+        await dropScreen(this.chatId, this.panel ?? undefined);
+        if (this.panel) await deleteMessage(this.chatId, this.panel);
+        return send(this.chatId, text, markup);
+      });
+      this.panel = null;
+    } else {
+      msgId = await this.ext(() => this.paint(text, inline));
+      this.panel = msgId;
+    }
+
+    /** Подсказка, если ответили не так: в том же окне, под вопросом. */
+    const warn = async (hint: string, incoming?: number) => {
+      await this.ext(async () => {
+        if (incoming) await removeIncoming(this.chatId, incoming);
+        if (msgId) await edit(this.chatId, msgId, `${text}\n\n⚠️ ${hint}`, inline);
+        else await send(this.chatId, hint);
+      });
+      await this.conv.skip();
+    };
 
     for (;;) {
       const c: Context = await this.conv.wait();
@@ -97,13 +200,8 @@ export class Wizard {
           await this.ext(() => answerCb(cq.id, t('stale-button')));
           await this.conv.skip();
         }
-        await this.ext(async () => {
-          await answerCb(cq.id);
-          if (msgId) {
-            const picked = key === 'back' || key === 'home' ? '' : `\n\n✅ <i>${esc(labels.get(key))}</i>`;
-            await edit(this.chatId, msgId, o.text + picked);
-          }
-        });
+        await this.ext(() => answerCb(cq.id));
+        this.via = 'button';
         if (key === 'back') return { kind: 'back' };
         if (key === 'home') return { kind: 'home' };
         return { kind: 'btn', data: key };
@@ -111,8 +209,10 @@ export class Wizard {
 
       const m = c.message;
       if (!m) await this.conv.skip({ next: true });
-      const done = async <A extends Answer>(a: A): Promise<A> => {
-        if (hasInline && msgId) await this.ext(() => clearKeyboard(this.chatId, msgId));
+      const incoming = m!.message_id;
+      const chosen = async <A extends Answer>(a: A, remove: boolean): Promise<A> => {
+        this.via = 'message';
+        if (remove) await this.ext(() => removeIncoming(this.chatId, incoming));
         return a;
       };
       if (m?.contact && (o.acceptContact || o.shareContactButton)) {
@@ -120,26 +220,23 @@ export class Wizard {
         const own = m.contact.user_id === c.from?.id;
         if (phone && (own || !o.shareContactButton)) {
           const name = [m.contact.first_name, m.contact.last_name].filter(Boolean).join(' ');
-          return done({ kind: 'contact', phone, name, own });
+          return chosen({ kind: 'contact', phone, name, own }, false);
         }
       }
       if (m?.photo?.length && o.acceptPhoto) {
-        return done({ kind: 'photo', fileId: m.photo[m.photo.length - 1]!.file_id });
+        // Фото оставляем в чате: человеку видно, что он уже прислал.
+        return chosen({ kind: 'photo', fileId: m.photo[m.photo.length - 1]!.file_id }, false);
       }
       if (m?.location && o.acceptLocation) {
-        return done({ kind: 'location', lat: m.location.latitude, lon: m.location.longitude });
+        return chosen({ kind: 'location', lat: m.location.latitude, lon: m.location.longitude }, true);
       }
       if (m?.text && o.acceptText && !m.text.startsWith('/')) {
-        const text = m.text.replace(/\s+/g, ' ').trim();
-        const problem = o.validate?.(text) ?? null;
-        if (problem) {
-          await this.ext(() => send(this.chatId, problem));
-          await this.conv.skip();
-        }
-        return done({ kind: 'text', text });
+        const value = m.text.replace(/\s+/g, ' ').trim();
+        const problem = o.validate?.(value) ?? null;
+        if (problem) await warn(problem, incoming);
+        return chosen({ kind: 'text', text: value }, true);
       }
-      await this.ext(() => send(this.chatId, o.hint ?? t('hint-use-buttons')));
-      await this.conv.skip();
+      await warn(o.hint ?? t('hint-use-buttons'), m?.text ? incoming : undefined);
     }
   }
 }

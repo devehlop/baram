@@ -1,7 +1,7 @@
 import { t } from '../i18n.js';
 import { now } from '../lib/time.js';
 import { getTrip, type TripView } from '../services/trips.js';
-import { kb, send } from './tg.js';
+import { dropScreen, kb, send, setScreen } from './tg.js';
 import { tripCard } from './ui/cards.js';
 
 /** Рейс ещё можно забронировать: выложен, не уехал, есть места. */
@@ -29,12 +29,15 @@ export async function sendTripLanding(chatId: number, tripId: number, viewerId: 
     await send(chatId, `${tripCard(trip)}\n\n${t('landing-trip-full')}`, kb([others]));
     return;
   }
-  await send(
+  // Карточка рейса — открытый экран: «Еду с ним» продолжит бронь в этом же сообщении.
+  await dropScreen(chatId);
+  const id = await send(
     chatId,
     `${t('landing-trip-title')}\n\n${tripCard(trip)}`,
     kb([
-      [{ text: t('btn-book-this-trip'), data: `p:bt:${trip.id}` }],
+      [{ text: t('btn-book-this-trip'), data: `p:bt:${trip.id}`, style: 'success' }],
       others,
     ]),
   );
+  setScreen(chatId, id);
 }

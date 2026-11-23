@@ -5,14 +5,19 @@ import { errorText, NavContext, type Nav, type Route } from './nav';
 import { Booking } from './screens/Booking';
 import { DriverHomeScreen, DriverTripScreen, DriverTripsScreen, PostTripScreen } from './screens/Driver';
 import { Help, Home, MyTrips, Onboarding } from './screens/Passenger';
+import { Board } from './screens/Board';
 import { SearchFlow } from './screens/SearchFlow';
-import { tg } from './tg';
+import { startScreen, tg } from './tg';
 import type { Me } from './types';
 
 export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
+  // Открыли по ссылке на доску — она сразу поверх главного экрана, «Назад» ведёт на главный.
+  const [stack, setStack] = useState<Route[]>(() => {
+    const start = startScreen();
+    return start?.screen === 'board' ? [{ name: 'home' }, { name: 'board', route: start.route, day: start.day }] : [{ name: 'home' }];
+  });
 
   const reloadMe = useCallback(async () => {
     try {
@@ -77,7 +82,8 @@ export function App() {
   return (
     <NavContext.Provider value={nav}>
       {route.name === 'home' && <Home />}
-      {route.name === 'search' && <SearchFlow repeat={route.repeat} />}
+      {route.name === 'search' && <SearchFlow repeat={route.repeat} trip={route.trip} request={route.request} />}
+      {route.name === 'board' && <Board initialRoute={route.route} initialDay={route.day} initialTab={route.tab} />}
       {route.name === 'trips' && <MyTrips />}
       {route.name === 'booking' && <Booking id={route.id} />}
       {route.name === 'help' && <Help />}

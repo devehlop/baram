@@ -2,16 +2,23 @@ import type { InlineKeyboard } from 'grammy';
 import { t } from '../../i18n.js';
 import { getDriver, type DriverView } from '../../services/drivers.js';
 import type { MyContext } from '../context.js';
-import { answerCb, edit, send } from '../tg.js';
+import { answerCb, dropScreen, edit, isReceipt, send, setScreen } from '../tg.js';
 
-/** Показать экран: по нажатию кнопки — заменить текущее сообщение, иначе отправить новое. */
+/**
+ * Показать экран. По нажатию кнопки — заменить сообщение с этой кнопкой.
+ * Из меню — прислать новое, а прошлый открытый экран убрать: в чате остаётся одно «окно».
+ */
 export async function show(ctx: MyContext, text: string, markup?: InlineKeyboard): Promise<void> {
+  const chatId = ctx.chat!.id;
   const cq = ctx.callbackQuery;
   if (cq) {
     await answerCb(cq.id);
-    if (cq.message && (await edit(cq.message.chat.id, cq.message.message_id, text, markup))) return;
+    // Квитанцию не трогаем: новый экран открывается отдельным сообщением.
+    const msg = cq.message && !isReceipt(chatId, cq.message.message_id) ? cq.message : null;
+    if (msg && (await edit(chatId, msg.message_id, text, markup))) return;
   }
-  await send(ctx.chat!.id, text, markup);
+  await dropScreen(chatId);
+  setScreen(chatId, await send(chatId, text, markup));
 }
 
 /** Короткий ответ на нажатие (всплывающая подсказка). */

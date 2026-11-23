@@ -15,7 +15,7 @@ type StepId =
   | 'seats' | 'child'
   | 'baggage' | 'baggageNote'
   | 'comment'
-  | 'results' | 'point' | 'summary' | 'fix' | 'requestDone';
+  | 'results' | 'point' | 'summary' | 'requestSummary' | 'fix' | 'requestDone';
 
 /** Номер вопроса для шапки «Шаг N из 7». */
 const STEP_NO: Partial<Record<StepId, number>> = {
@@ -75,8 +75,25 @@ const P_TYPES: { type: PassengerType; label: string }[] = [
   { type: 'child', label: 'Ребёнок до 14' },
 ];
 
-export function SearchFlow({ repeat }: { repeat?: boolean }) {
+/** Заявка с доски: направление и день уже выбраны. */
+export interface RequestStart {
+  directionId: number;
+  fromSide: Side;
+  day: string;
+  dayLabel: string;
+}
+
+/**
+ * Три пути:
+ * - рейс выбран на доске (trip): откуда → куда → итог, остальное — по умолчанию, меняется кнопкой «Исправить»;
+ * - заявка с доски (request): время → откуда → куда → итог;
+ * - «Повторить поездку» (repeat): прежняя анкета, спрашиваем только день и время.
+ */
+export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?: Trip; request?: RequestStart }) {
   const nav = useNav();
+  const mode: 'trip' | 'request' | 'classic' = trip ? 'trip' : request ? 'request' : 'classic';
+  /** Направление и сторона, к которым привязаны «откуда» и «куда», если они уже известны. */
+  const anchor = trip ? { directionId: trip.directionId, fromSide: trip.fromSide } : request ?? null;
   const form = useLoad<FormData>('/form');
   const [step, setStep] = useState<StepId>('who');
   const [history, setHistory] = useState<StepId[]>([]);
@@ -96,6 +113,18 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
   useEffect(() => {
     if (!data || started) return;
     setStarted(true);
+    // Самые частые ответы — сразу: еду сам, одно место, сумка, без ребёнка.
+    const defaults = { passenger: null, seats: 1, childSeat: 'none' as ChildSeat, baggage: 'bag' as Baggage };
+    if (trip) {
+      setDraft({ ...defaults, trip, pickupPoint: null });
+      setStep('from');
+      return;
+    }
+    if (request) {
+      setDraft({ ...defaults, day: request.day, dayLabel: request.dayLabel });
+      setStep('time');
+      return;
+    }
     const b = repeat ? data.lastBooking : null;
     if (!b?.from || !b.to) return;
     const addr = (p: NonNullable<Booking['from']>): Addr | undefined => {
@@ -116,7 +145,7 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
     });
     setFixing(true);
     setStep('day');
-  }, [data, repeat, started]);
+  }, [data, repeat, started, trip, request]);
 
   const goto = (next: StepId) => {
     setHistory((h) => [...h, step]);
@@ -135,8 +164,21 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
     setStep(prev);
   };
 
-  /** Вопрос отвечен: к следующему, а после «Исправить» — сразу к списку рейсов. */
+  /** Последний экран короткого пути: итог брони (с точкой сбора, если она нужна) или итог заявки. */
+  const finalStep = (): StepId =>
+    mode === 'request' ? 'requestSummary' : trip && trip.pickupMode !== 'door' && trip.pickupPoints.length ? 'point' : 'summary';
+
+  /** Вопрос отвечен: к следующему, а после «Исправить» — сразу к списку рейсов (или к итогу в коротком пути). */
   const done = (question: StepId) => {
+    if (mode !== 'classic') {
+      if (fixing) {
+        setFixing(false);
+        return goto(finalStep());
+      }
+      if (question === 'day') return goto('from'); // в заявке время выбрано
+      if (question === 'from') return goto('to');
+      return goto(finalStep());
+    }
     if (fixing) {
       setFixing(false);
       return goto('results');
@@ -180,6 +222,10 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
     return starts.some((s) => s.directionId === l.directionId && s.side !== l.side);
   };
 
+  /** Место подходит: при известном рейсе или заявке — по его стороне, иначе — в пару к выбранному «откуда». */
+  const fitsPlace = (l: { directionId: number; side: Side }, isTo: boolean) =>
+    anchor ? l.directionId === anchor.directionId && (l.side === anchor.fromSide) !== isTo : !isTo || reachable(l);
+
   const rideBody = () => ({
     passenger: draft.passenger,
     from: { localityId: draft.from!.localityId, address: draft.from!.address },
@@ -212,10 +258,15 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
     }
   };
 
-  const stepNo = STEP_NO[step];
+  const short: Partial<Record<StepId, number>> =
+    mode === 'trip'
+      ? { from: 1, fromVillage: 1, fromAddr: 1, to: 2, toVillage: 2, toAddr: 2 }
+      : { time: 1, exact: 1, from: 2, fromVillage: 2, fromAddr: 2, to: 3, toVillage: 3, toAddr: 3 };
+  const total = mode === 'classic' ? TOTAL : mode === 'trip' ? 2 : 3;
+  const stepNo = mode === 'classic' ? STEP_NO[step] : short[step];
   const frame = (question: string, body: ReactNode, note?: string) => (
     <Screen steps>
-      <StepHeader step={stepNo ?? TOTAL} total={TOTAL} onBack={stepBack} onHome={() => nav.reset()} />
+      <StepHeader step={stepNo ?? total} total={total} onBack={stepBack} onHome={() => nav.reset()} />
       <h1 className="h1">{question}</h1>
       {note && <p className="muted">{note}</p>}
       {body}
@@ -226,7 +277,7 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
   // ——— Вопрос «Откуда» / «Куда» ———
   const placeStep = (which: 'from' | 'to') => {
     const isTo = which === 'to';
-    const fits = (l: { directionId: number; side: Side }) => !isTo || reachable(l);
+    const fits = (l: { directionId: number; side: Side }) => fitsPlace(l, isTo);
     const saved = data.addresses.filter(fits);
     const cities = [...new Set(data.localities.filter((l) => l.kind === 'city' && fits(l)).map((l) => l.name))];
     const hasVillages = data.localities.some((l) => l.kind === 'village' && fits(l));
@@ -242,7 +293,7 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
       done(which);
     };
     return frame(
-      isTo ? 'Куда едете?' : 'Откуда едете?',
+      mode === 'classic' ? (isTo ? 'Куда едете?' : 'Откуда едете?') : isTo ? 'Куда вас отвезти?' : 'Откуда вас забрать?',
       <div className="stack">
         {saved.map((a) => (
           <OptionCard key={`s${a.id}`} icon="home" title={a.label} sub={`${a.city}, ${a.address}`}
@@ -262,7 +313,7 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
 
   const villageStep = (which: 'from' | 'to') => {
     const isTo = which === 'to';
-    const villages = data.localities.filter((l) => l.kind === 'village' && (!isTo || reachable(l)));
+    const villages = data.localities.filter((l) => l.kind === 'village' && fitsPlace(l, isTo));
     return frame(
       'Какая деревня?',
       <>
@@ -406,7 +457,7 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
       return frame(
         'Сколько вас?',
         <div className="grid2" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-          {[1, 2, 3, 4, 5, 6].map((n) => (
+          {[1, 2, 3, 4, 5, 6].filter((n) => !draft.trip || mode !== 'trip' || n <= draft.trip.seatsFree).map((n) => (
             <button type="button" key={n} className="btn btn--outline" aria-pressed={draft.seats === n} aria-label={seatsLabel(n)}
               onClick={() => { patch({ seats: n }); goto('child'); }}>
               {n}
@@ -563,10 +614,38 @@ export function SearchFlow({ repeat }: { repeat?: boolean }) {
       );
     }
 
+    case 'requestSummary': {
+      const whenText = draft.timeKind === 'exact' ? `в ${minutesLabel(draft.exactMinutes ?? 0)}` : TIME_SHORT[draft.timeKind!];
+      const rows: [string, ReactNode][] = [
+        ['Едет', draft.passenger ? `${draft.passenger.name}, ${fmtPhone(draft.passenger.phone) || draft.passenger.phone}` : `${nav.me.user!.name} (вы)`],
+        ['Откуда', `${draft.from!.city}, ${draft.from!.address}`],
+        ['Куда', `${draft.to!.city}, ${draft.to!.address}`],
+        ['Когда', `${draft.dayLabel ?? ''}, ${whenText}`],
+        ['Мест · багаж', `${draft.seats} · ${BAGGAGE[draft.baggage!]}`],
+      ];
+      if (draft.childSeat && draft.childSeat !== 'none') rows.push(['Ребёнок до 7 лет', draft.childSeat === 'own' ? 'кресло своё' : 'нужно кресло водителя']);
+      if (draft.comment) rows.push(['Комментарий', draft.comment]);
+      return (
+        <Screen>
+          <PageHeader title="Заявка водителям" big onBack={stepBack} />
+          <SummaryRows rows={rows} />
+          <p className="muted">Заявку увидят все водители направления. Как только кто-то выложит рейс или возьмёт её, мы напишем в чат.</p>
+          {error && <ErrorNote>{errorText(error)}</ErrorNote>}
+          <div className="spacer" />
+          <div className="stack">
+            <Button variant="confirm" icon="check" disabled={busy} onClick={() => void submit('request')}>Отправить заявку</Button>
+            <Button variant="outline" size="card" onClick={() => goto('fix')}>Исправить</Button>
+          </div>
+        </Screen>
+      );
+    }
+
     case 'fix': {
+      // По рейсу с доски день не меняют; в заявке «Когда» — это время.
+      const when: [StepId, string, IconName][] = mode === 'trip' ? [] : [[mode === 'request' ? 'time' : 'day', 'Когда', 'calendar']];
       const fields: [StepId, string, IconName][] = [
-        ['who', 'Кто едет', 'user'], ['from', 'Откуда', 'pin'], ['to', 'Куда', 'pin'], ['day', 'Когда', 'calendar'],
-        ['seats', 'Сколько мест', 'users'], ['baggage', 'Багаж', 'suitcase'], ['comment', 'Комментарий', 'help'],
+        ['who', 'Кто едет', 'user'], ['from', 'Откуда', 'pin'], ['to', 'Куда', 'pin'], ...when,
+        ['seats', 'Сколько мест и ребёнок', 'users'], ['baggage', 'Багаж', 'suitcase'], ['comment', 'Комментарий', 'help'],
       ];
       return (
         <Screen steps>

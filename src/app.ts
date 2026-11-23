@@ -11,6 +11,8 @@ export interface App {
   adminIds: number[];
   /** Имя бота без @ — для ссылки в постах канала. */
   botUsername?: string;
+  /** Адрес Mini App, если она включена: кнопки «Открыть в приложении». */
+  miniappUrl?: string;
 }
 
 export const app = {} as App;

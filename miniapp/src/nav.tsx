@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './api';
-import type { Me } from './types';
+import type { RequestStart } from './screens/SearchFlow';
+import type { Me, Trip } from './types';
 
 export type Route =
   | { name: 'home' }
-  | { name: 'search'; repeat?: boolean }
+  | { name: 'search'; repeat?: boolean; trip?: Trip; request?: RequestStart }
+  | { name: 'board'; route?: string; day?: string; tab?: 'trips' | 'requests' }
   | { name: 'trips' }
   | { name: 'booking'; id: number }
   | { name: 'help' }

@@ -9,7 +9,6 @@ btn-home = В начало
 btn-yes = Да
 btn-no = Нет
 btn-fix = Исправить
-btn-all-correct = ✅ Всё верно
 btn-skip = Пропустить
 btn-cancel = Отмена
 btn-close = Закрыть
@@ -44,6 +43,7 @@ menu-title-passenger = Что нужно сделать?
 menu-title-driver = Меню водителя. Что нужно сделать?
 menu-find = 🚗 Найти поездку
 menu-my-trips = 🔁 Мои поездки
+menu-board = 📋 Доска
 menu-help = ☎️ Помощь
 menu-become-driver = 🚘 Я водитель
 menu-to-driver = 🚘 Меню водителя
@@ -392,10 +392,12 @@ setting-dispatcher_phone = Телефон диспетчера
 day-today = Сегодня
 day-tomorrow = Завтра
 hint-time = Напишите время цифрами, например 17:00.
-step-of = Шаг { $n } из { $total }
 action-not-available = Это действие уже недоступно.
 prompt-cancelled = Хорошо, ничего не меняем.
 cmd-start = Главное меню
+cmd-find = Найти поездку
+cmd-board = Доска: все рейсы и заявки
+cmd-trips = Мои поездки
 cmd-privacy = Политика данных
 cmd-help = Помощь и связь с диспетчером
 miniapp-button = Барам
@@ -576,13 +578,16 @@ who-ask-type = Кто это?
 who-type-adult = Взрослый
 who-type-teen = Подросток 14–17 лет
 who-type-child = Ребёнок до 14 лет
-search-ask-from = Откуда едете?
-search-ask-to = Куда едете?
+search-ask-route = Куда едете?
+btn-as-last-time = Как в прошлый раз:
+search-ask-from = Откуда вас забрать?
+search-ask-to = Куда вас отвезти?
 search-place-note = Выберите город или сохранённый адрес.
 btn-village = Деревня или село
 search-ask-village = Какая деревня? Если вашей нет в списке — напишите диспетчеру через «Помощь».
 search-village-warning = ℹ️ За деревню может быть доплата. Уточните у водителя.
-search-ask-address = { $city }. Напишите улицу и дом. Или пришлите геопозицию: скрепка → Геопозиция.
+search-ask-address = { $city }. Откуда забрать? Напишите улицу и дом. Или пришлите геопозицию: скрепка → Геопозиция.
+search-ask-address-to = { $city }. Куда отвезти? Напишите улицу и дом. Или пришлите геопозицию: скрепка → Геопозиция.
 search-address-hint = Напишите адрес словами: улица и дом. Например: ул. Ленина, 12.
 address-geo = точка на карте
 search-ask-day = Когда едете?
@@ -604,39 +609,44 @@ baggage-btn-many = Много багажа
 search-ask-baggage-note = Коротко напишите, что везёте. За крупный багаж — предоплата { $amount } водителю переводом.
 search-ask-comment = Комментарий водителю
 search-comment-note = Например: «Подъезд 3, позвоните заранее». Можно пропустить.
-search-found = { $n ->
-    [one] <b>Нашёлся { $n } рейс</b>
-    [few] <b>Нашлось { $n } рейса</b>
-   *[many] <b>Нашлось { $n } рейсов</b>
-}
-search-near = <b>Точно на это время рейса нет. Ближайшие рейсы:</b>
-search-also-near = <b>Ещё рядом по времени:</b>
 search-pick = Выберите рейс. Не подошло — оставьте заявку, её увидят водители.
-search-none = Рейсов на это время пока нет. Оставьте заявку — её увидят все водители направления.
+search-none = Оставьте заявку — её увидят все водители направления. Как только кто-то выложит рейс, мы напишем.
+search-day-trips = { $n ->
+    [one] { $n } рейс на этот день
+    [few] { $n } рейса на этот день
+   *[many] { $n } рейсов на этот день
+}
+search-day-empty = На этот день рейсов пока нет
+search-next-day = Ближайшие рейсы — { $day }: { $n }.
+btn-show-day = Показать: { $day }
+trip-seats-free = { $n ->
+    [one] { $n } место
+    [few] { $n } места
+   *[many] { $n } мест
+}
+card-title-booking = Проверьте и бронируйте
+card-title-request = Заявка водителям
+card-hint = Всё верно — нажмите зелёную кнопку. Что-то не так — поменяйте кнопками ниже.
+card-baggage-bag = Сумка
+card-baggage-suitcase = Чемодан
+card-baggage-many = Много багажа
+card-child-none = Без ребёнка
+card-child-own = Своё кресло
+card-child-driver = Кресло водителя
+btn-book = ✅ Забронировать
+btn-send-request = 📨 Отправить заявку
+btn-comment-add = Комментарий
+btn-comment-edit = Комментарий ✏️
+btn-comment-remove = Убрать комментарий
+btn-other-trip = 🔄 Другой рейс
+search-no-driver-child-seat = У этого водителя нет детского кресла: возьмите своё или выберите другой рейс.
 btn-leave-request = 🔔 Оставить заявку
 search-ask-point = { $driver } забирает из своих точек. Где вам удобно сесть?
 point-my-address = От моего адреса
-summary-title = Проверьте поездку
 summary-pay-note = { " " }— оплата водителю, наличными или переводом
 summary-prepay-note = За крупный багаж — предоплата { $amount } водителю. Реквизиты придут после того, как водитель примет бронь.
-search-field-who = Кто едет
-search-field-from = Откуда
-search-field-to = Куда
-search-field-when = Когда
-search-field-seats = Сколько мест
-search-field-baggage = Багаж
-search-field-comment = Комментарий
 search-cancelled = Поиск закрыт. Начать заново — кнопка «Найти поездку».
-search-repeat-intro =
-    Повторяем поездку:
-    { $from } → { $to }
-
-    Осталось выбрать день и время.
-search-trip-intro =
-    Бронируем место в рейсе <b>{ $route }</b>, { $when }, водитель { $driver }.
-    Ответьте на несколько коротких вопросов — день и время уже известны.
 search-trip-gone = Этот рейс забронировать уже нельзя: места заняли, водитель уехал или отменил рейс. Давайте найдём другой — вот рейсы на тот же день.
-search-trip-no-child-seat = В этом рейсе нет детского кресла. Вот рейсы на тот же день, где кресло есть.
 landing-trip-title = <b>Рейс по ссылке</b>
 landing-trip-unavailable = Этот рейс уже не забронировать: места заняли, водитель уехал или отменил рейс. Посмотрите другие рейсы — кнопка ниже.
 landing-own-trip = Это ваш рейс. Так его увидит пассажир, открывший ссылку, — с кнопкой «Еду с ним».
@@ -676,8 +686,8 @@ ride-eta = { $n ->
     [one] 🚗 Водитель будет примерно через { $n } минуту
     [few] 🚗 Водитель будет примерно через { $n } минуты
    *[many] 🚗 Водитель будет примерно через { $n } минут
-}. Пожалуйста, будьте готовы.
-ride-picked-up-other = ✅ { $name } в машине: { $car }, { $plate }, водитель { $driver }.
+}. Пожалуйста, будьте готовы. Телефон водителя: { $phone }
+ride-picked-up-other = ✅ { $name } в машине: { $car }, { $plate }, водитель { $driver }, телефон { $phone }.
 ride-arrived-self = 🏁 Поездка завершена. Спасибо, что едете с «Барам»!
 ride-arrived-other = 🏁 { $name } доехал(а). Поездка завершена.
 ride-no-show = Водитель отметил, что пассажир не пришёл на рейс { $when }. Если это ошибка — напишите через «Помощь».
@@ -763,3 +773,22 @@ channel-empty = Рейсов на этот день пока нет.
 channel-footer = Забронировать место — в боте, кнопка ниже.
 channel-button = 🚗 Найти поездку
 channel-book-link = забронировать
+
+## Доска: все рейсы и заявки
+
+board-title = Доска
+board-tab-trips = Рейсы
+board-tab-requests = Ищут попутку
+board-tab-trips-title = Водители выложили рейсы
+board-tab-requests-title = Пассажиры ищут машину
+board-no-trips = На этот день рейсов пока нет. Оставьте заявку — водители её увидят.
+board-no-requests = На этот день заявок нет.
+board-page = Показаны { $from }–{ $to } из { $total }.
+board-page-prev = Раньше
+board-page-next = Дальше
+board-privacy-note = <i>Имена, телефоны и адреса пассажиров видит только водитель, который взял заявку.</i>
+board-ride = Еду:
+board-my-trip = Мой рейс
+board-find = 🔎 Забронировать на этот день
+board-open-app = 📱 Открыть в приложении
+board-empty-directions = Направлений пока нет.

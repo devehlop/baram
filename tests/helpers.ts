@@ -21,6 +21,8 @@ interface InlineButton {
 export interface SentMessage {
   chatId: number;
   messageId: number;
+  /** Когда сообщение последний раз появилось или изменилось: по нему видно, что человек видит сейчас. */
+  seq: number;
   text: string;
   inline: InlineButton[][];
   reply: string[][] | null;
@@ -28,18 +30,25 @@ export interface SentMessage {
   photos: number;
 }
 
+const NOT_MODIFIED = Symbol('not modified');
+
 /** Подмена Telegram: вместо сети запоминает всё, что бот отправил. */
 export class FakeTelegram {
   messages: SentMessage[] = [];
   answers: { id: string; text?: string }[] = [];
-  private nextId = 1000;
+  /** Номера сообщений общие для бота и людей — как в настоящем личном чате. */
+  nextId = 1000;
+  /** Счётчик изменений: каждое новое или отредактированное сообщение получает следующий номер. */
+  seq = 0;
 
   fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const method = String(url).split('/').pop()!;
     const payload = init?.body ? (JSON.parse(String(init.body)) as Record<string, any>) : {};
-    return new Response(JSON.stringify({ ok: true, result: this.handle(method, payload) }), {
-      headers: { 'content-type': 'application/json' },
-    });
+    const result = this.handle(method, payload);
+    const body = result === NOT_MODIFIED
+      ? { ok: false, error_code: 400, description: 'Bad Request: message is not modified: specified new message content and reply markup are exactly the same' }
+      : { ok: true, result };
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
 
   private parseMarkup(rm: unknown): Pick<SentMessage, 'inline' | 'reply' | 'removedKeyboard'> {
@@ -57,32 +66,41 @@ export class FakeTelegram {
     switch (method) {
       case 'sendMessage': {
         const messageId = this.nextId++;
-        this.messages.push({ chatId: chat.id || 0, messageId, text: p.text, photos: 0, ...this.parseMarkup(p.reply_markup) });
+        this.messages.push({ chatId: chat.id || 0, messageId, seq: ++this.seq, text: p.text, photos: 0, ...this.parseMarkup(p.reply_markup) });
         if (Number.isNaN(chat.id)) this.messages[this.messages.length - 1]!.chatId = -1;
         return { message_id: messageId, date, chat, text: p.text };
       }
       case 'sendPhoto': {
         const messageId = this.nextId++;
-        this.messages.push({ chatId: chat.id, messageId, text: p.caption ?? '', photos: 1, inline: [], reply: null, removedKeyboard: false });
+        this.messages.push({ chatId: chat.id, messageId, seq: ++this.seq, text: p.caption ?? '', photos: 1, inline: [], reply: null, removedKeyboard: false });
         return { message_id: messageId, date, chat };
       }
       case 'sendMediaGroup': {
         const media = typeof p.media === 'string' ? JSON.parse(p.media) : p.media;
-        const messageId = this.nextId++;
-        this.messages.push({ chatId: chat.id, messageId, text: '', photos: media.length, inline: [], reply: null, removedKeyboard: false });
+        const messageId = this.nextId;
+        this.nextId += media.length;
+        this.messages.push({ chatId: chat.id, messageId, seq: ++this.seq, text: '', photos: media.length, inline: [], reply: null, removedKeyboard: false });
         return media.map((_: unknown, i: number) => ({ message_id: messageId + i, date, chat }));
       }
       case 'editMessageText': {
         const msg = this.messages.find((m) => m.messageId === p.message_id);
+        // Как настоящий Telegram: тот же текст и те же кнопки — ошибка «не изменилось».
+        if (msg && msg.text === p.text && JSON.stringify(msg.inline) === JSON.stringify(this.parseMarkup(p.reply_markup).inline)) {
+          return NOT_MODIFIED;
+        }
         if (msg) {
           msg.text = p.text;
           msg.inline = this.parseMarkup(p.reply_markup).inline;
+          msg.seq = ++this.seq;
         }
         return { message_id: p.message_id, date, chat, text: p.text };
       }
       case 'editMessageReplyMarkup': {
         const msg = this.messages.find((m) => m.messageId === p.message_id);
-        if (msg) msg.inline = this.parseMarkup(p.reply_markup).inline;
+        if (msg) {
+          msg.inline = this.parseMarkup(p.reply_markup).inline;
+          msg.seq = ++this.seq;
+        }
         return { message_id: p.message_id, date, chat };
       }
       case 'deleteMessage': {
@@ -97,13 +115,13 @@ export class FakeTelegram {
     }
   }
 
+  /** Сообщения бота в чате — в порядке, в котором они последний раз появлялись или менялись. */
   of(chatId: number): SentMessage[] {
-    return this.messages.filter((m) => m.chatId === chatId);
+    return this.messages.filter((m) => m.chatId === chatId).sort((a, b) => a.seq - b.seq);
   }
 }
 
 let updateId = 1;
-let userMessageId = 1;
 
 /** Человек в тесте: пишет боту, нажимает кнопки, читает ответы. */
 export class TestUser {
@@ -124,10 +142,10 @@ export class TestUser {
   }
 
   private async message(extra: Record<string, unknown>): Promise<void> {
-    this.mark = this.h.tg.messages.length;
+    this.mark = this.h.tg.seq;
     await this.h.bot.handleUpdate({
       update_id: updateId++,
-      message: { message_id: userMessageId++, date: Math.floor(Date.now() / 1000), chat: this.chat, from: this.from, ...extra },
+      message: { message_id: this.h.tg.nextId++, date: Math.floor(Date.now() / 1000), chat: this.chat, from: this.from, ...extra },
     } as any);
   }
 
@@ -143,7 +161,7 @@ export class TestUser {
     });
   }
 
-  async photo(fileId = `photo-${userMessageId}`): Promise<void> {
+  async photo(fileId = `photo-${this.h.tg.nextId}`): Promise<void> {
     await this.message({ photo: [{ file_id: fileId + '-s', file_unique_id: 'u', width: 90, height: 90 }, { file_id: fileId, file_unique_id: 'u2', width: 800, height: 600 }] });
   }
 
@@ -167,7 +185,7 @@ export class TestUser {
   async pressData(data: string, messageId?: number): Promise<void> {
     const msgs = this.h.tg.of(this.id);
     const id = messageId ?? msgs[msgs.length - 1]?.messageId ?? 1;
-    this.mark = this.h.tg.messages.length;
+    this.mark = this.h.tg.seq;
     await this.h.bot.handleUpdate({
       update_id: updateId++,
       callback_query: {
@@ -186,11 +204,11 @@ export class TestUser {
     return msgs[msgs.length - 1]?.text ?? '';
   }
 
-  /** Все сообщения бота этому человеку после его последнего действия. */
+  /** Все сообщения бота этому человеку, появившиеся или изменившиеся после его последнего действия. */
   fresh(): string {
-    return this.h.tg.messages
-      .slice(this.mark)
-      .filter((m) => m.chatId === this.id)
+    return this.h.tg
+      .of(this.id)
+      .filter((m) => m.seq > this.mark)
       .map((m) => m.text)
       .join('\n---\n');
   }

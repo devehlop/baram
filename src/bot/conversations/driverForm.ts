@@ -248,12 +248,12 @@ export async function runDriverForm(w: Wizard, telegramId: number): Promise<void
 }
 
 export async function driverForm(conv: MyConversation, ctx: Context): Promise<void> {
-  await runDriverForm(new Wizard(conv, ctx.chat!.id), ctx.from!.id);
+  await runDriverForm(new Wizard(conv, ctx.chat!.id, ctx.callbackQuery?.message?.message_id), ctx.from!.id);
 }
 
 /** Админ попросил прислать фото заново. */
 export async function driverPhotos(conv: MyConversation, ctx: Context): Promise<void> {
-  const w = new Wizard(conv, ctx.chat!.id);
+  const w = new Wizard(conv, ctx.chat!.id, ctx.callbackQuery?.message?.message_id);
   const telegramId = ctx.from!.id;
   const photos = await collectPhotos(w);
   await w.ext(async () => {

@@ -117,23 +117,20 @@ describe('ссылка на рейс из чата', () => {
     expect(p.buttons()).toContain('🚗 Еду с ним');
 
     await p.press('Еду с ним');
-    expect(p.fresh()).toContain('Бронируем место в рейсе');
-    await p.press('Я сам');
+    // День, время и рейс уже известны: сразу «откуда» и «куда», потом карточка.
+    expect(p.last()).toContain('Откуда вас забрать?');
+    expect(p.last()).toContain('Буинск → Казань');
     await p.press('Буинск');
     expect(p.buttons()).not.toContain('Буинск'); // «куда» — только Казань и т. п.
     await p.text('ул. Ленина, 12');
-    expect(p.last()).toContain('Куда едете?');
+    expect(p.last()).toContain('Куда вас отвезти?');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    // День и время не спрашиваем — сразу места, а после анкеты сразу итог, без списка рейсов.
-    expect(p.last()).toContain('Шаг 4 из 6');
-    await p.press('1');
-    await p.press('Нет');
-    await p.press('Только сумка');
-    await p.press('Пропустить');
-    expect(p.last()).toContain('Проверьте поездку');
+    expect(p.last()).toContain('Проверьте и бронируйте');
     expect(p.last()).toContain('11:00');
-    await p.press('Всё верно');
+    await p.press('Забронировать');
+    // Бронь шла в том же сообщении, где была карточка рейса из ссылки.
+    expect(h.tg.of(101).filter((m) => m.text.includes('Рейс по ссылке'))).toHaveLength(0);
 
     const list = await listTripBookings(trip.id);
     expect(list).toHaveLength(1);
@@ -174,16 +171,12 @@ describe('ссылка на рейс из чата', () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await p.text(`/start t_${trip.id}`);
     await p.press('Еду с ним');
-    await p.press('Я сам');
     await p.press('Буинск');
     await p.text('ул. Ленина, 12');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    await p.press('1');
-    await p.press('Нет');
-    await p.press('Только сумка');
     await cancelTripAction(trip.id, { driverId: await dbId(201) });
-    await p.press('Пропустить');
+    await p.press('Забронировать');
     expect(p.fresh()).toContain('забронировать уже нельзя');
     expect(p.buttons()).toContain('🔔 Оставить заявку');
   });
