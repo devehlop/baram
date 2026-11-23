@@ -639,6 +639,7 @@ btn-comment-add = Комментарий
 btn-comment-edit = Комментарий ✏️
 btn-comment-remove = Убрать комментарий
 btn-other-trip = 🔄 Другой рейс
+btn-car-photos = 📷 Фото машины
 search-no-driver-child-seat = У этого водителя нет детского кресла: возьмите своё или выберите другой рейс.
 btn-leave-request = 🔔 Оставить заявку
 search-ask-point = { $driver } забирает из своих точек. Где вам удобно сесть?

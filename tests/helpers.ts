@@ -9,6 +9,7 @@ import { createDb, type Db } from '../src/db/client.js';
 import { runMigrations } from '../src/db/migrate.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
+import { clearImageCache } from '../src/services/photos.js';
 import { setStrictTexts } from '../src/i18n.js';
 import { setNow, setZone } from '../src/lib/time.js';
 
@@ -41,8 +42,17 @@ export class FakeTelegram {
   /** Счётчик изменений: каждое новое или отредактированное сообщение получает следующий номер. */
   seq = 0;
 
+  /** Какие файлы скачивались по ссылке /file/bot<токен>/… */
+  downloads: string[] = [];
+
   fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const method = String(url).split('/').pop()!;
+    const href = String(url);
+    if (href.includes('/file/bot')) {
+      const path = href.split('/file/bot')[1]!.split('/').slice(1).join('/');
+      this.downloads.push(path);
+      return new Response(new TextEncoder().encode(`jpeg:${path}`), { headers: { 'content-type': 'application/octet-stream' } });
+    }
+    const method = href.split('/').pop()!;
     const payload = init?.body ? (JSON.parse(String(init.body)) as Record<string, any>) : {};
     const result = this.handle(method, payload);
     const body = result === NOT_MODIFIED
@@ -107,6 +117,8 @@ export class FakeTelegram {
         this.messages = this.messages.filter((m) => m.messageId !== p.message_id);
         return true;
       }
+      case 'getFile':
+        return { file_id: p.file_id, file_unique_id: p.file_id, file_path: `photos/${p.file_id}.jpg` };
       case 'answerCallbackQuery':
         this.answers.push({ id: p.callback_query_id, text: p.text });
         return true;
@@ -282,6 +294,7 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
     has_main_web_app: false,
   } as any;
   initApp({ db, api: bot.api, adminIds: opts.adminIds ?? [ADMIN_ID], botUsername: 'baram_test_bot' });
+  clearImageCache();
   await seed();
   const h: Harness = {
     bot,

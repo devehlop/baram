@@ -175,6 +175,10 @@ describe('доска в Mini App', () => {
     expect(res.json.trips).toHaveLength(1);
     expect(res.json.trips[0].driver).not.toHaveProperty('phone');
     expect(res.json.trips[0].driver).not.toHaveProperty('plate');
+    // Фото машины — только их число: file_id из Telegram наружу не уходят.
+    expect(res.json.trips[0].driver).toMatchObject({ photoCount: 2 });
+    expect(res.json.trips[0].driver).not.toHaveProperty('photos');
+    expect(JSON.stringify(res.json.trips)).not.toContain('car1');
     expect(res.json.requests).toEqual([
       expect.objectContaining({ fromCity: 'Буинск', toCity: 'Казань', seats: 1, timeKind: 'evening' }),
     ]);
@@ -188,5 +192,33 @@ describe('доска в Mini App', () => {
     expect(back.json).toMatchObject({ day: '2026-11-11', trips: [], requests: [] });
     const fallback = await call(102, 'GET', '/api/board?route=zzz&day=когда-нибудь');
     expect(fallback.json).toMatchObject({ day: '2026-11-10', route: { directionId: 1, fromSide: 'a' } });
+  });
+});
+
+describe('фото машины в Mini App', () => {
+  /** Запрос картинки: статус, тип и байты как текст. */
+  async function image(tgId: number | null, path: string) {
+    const res = await api.request(path, {
+      headers: tgId ? { authorization: `tma ${signInitData({ id: tgId, first_name: 'T' }, TOKEN)}` } : {},
+    });
+    return { status: res.status, type: res.headers.get('content-type'), body: await res.text() };
+  }
+
+  it('пассажир видит все фото машины до брони; файл из Telegram качается один раз', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    await passenger(h, 101, 'Айгуль', '+79170000002');
+    const trip = await postTrip(201, { time: '17:00' });
+
+    const first = await image(101, `/api/trips/${trip.id}/photos/0`);
+    expect(first).toEqual({ status: 200, type: 'image/jpeg', body: 'jpeg:photos/car1.jpg' });
+    expect((await image(101, `/api/trips/${trip.id}/photos/1`)).body).toBe('jpeg:photos/car2.jpg');
+    await image(101, `/api/trips/${trip.id}/photos/0`);
+    expect(h.tg.downloads).toEqual(['photos/car1.jpg', 'photos/car2.jpg']);
+    // В ответе нет ссылки на файл Telegram — в ней токен бота.
+    expect(first.body).not.toContain(TOKEN);
+
+    expect((await image(101, `/api/trips/${trip.id}/photos/2`)).status).toBe(404);
+    expect((await image(101, `/api/trips/999/photos/0`)).status).toBe(404);
+    expect((await image(null, `/api/trips/${trip.id}/photos/0`)).status).toBe(401);
   });
 });

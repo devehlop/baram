@@ -76,7 +76,8 @@ export interface Trip {
     childSeat: boolean;
     badge: boolean;
     priority: boolean;
-    photo: string | null;
+    /** Сколько фото машины в анкете водителя: /api/trips/<id>/photos/<0…n-1>. */
+    photoCount?: number;
     // Открываются после подтверждения брони:
     plate?: string;
     phone?: string;

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useImage } from './api';
 import { ChuvashBand, Rosette } from './Ornaments';
 import { arrival, car, money, seats, time, TRUNK } from './format';
 import type { Trip } from './types';
@@ -180,6 +181,57 @@ export function Avatar({ name, gold, large }: { name: string; gold?: boolean; la
   return <div className={`avatar${gold ? ' avatar--gold' : ''}${large ? ' avatar--lg' : ''}`} aria-hidden="true">{name.trim().charAt(0).toUpperCase()}</div>;
 }
 
+function CarPhoto({ path, className }: { path: string; className: string }) {
+  const url = useImage(path);
+  return url ? <img className={className} src={url} alt="" /> : <span className={`${className} car-photo--empty`} />;
+}
+
+/** Фото машины из анкеты водителя: лента миниатюр, по нажатию — во весь экран. */
+export function CarPhotos({ tripId, count, label }: { tripId: number; count: number; label: string }) {
+  const [open, setOpen] = useState<number | null>(null);
+  if (count <= 0) return null;
+  const paths = Array.from({ length: count }, (_, i) => `/trips/${tripId}/photos/${i}`);
+  return (
+    <>
+      <div className="car-photos" aria-label={`Фото машины: ${label}`}>
+        {paths.map((p, i) => (
+          <button type="button" key={p} className="car-photos__item" aria-label={`Фото ${i + 1} из ${count}`} onClick={() => setOpen(i)}>
+            <CarPhoto path={p} className="car-photo" />
+          </button>
+        ))}
+      </div>
+      {open !== null && <PhotoViewer paths={paths} start={open} label={label} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+function PhotoViewer({ paths, start, label, onClose }: { paths: string[]; start: number; label: string; onClose: () => void }) {
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = strip.current;
+    if (el) el.scrollLeft = el.clientWidth * start;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [start, onClose]);
+  return (
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={label}>
+      <div className="viewer__head">
+        <span className="viewer__title">{label}</span>
+        <button type="button" className="viewer__close" aria-label="Закрыть" onClick={onClose}><Icon name="close" /></button>
+      </div>
+      <div className="viewer__strip" ref={strip} onClick={onClose}>
+        {paths.map((p) => (
+          <div className="viewer__page" key={p}>
+            <CarPhoto path={p} className="viewer__img" />
+          </div>
+        ))}
+      </div>
+      {paths.length > 1 && <div className="viewer__hint">Листайте в сторону</div>}
+    </div>
+  );
+}
+
 /** Карточка рейса в списке. Первая — с красной кнопкой и узорной полосой снизу. */
 export function TripCard(props: { trip: Trip; first: boolean; village: boolean; needChildSeat: boolean; showDay?: string; onPick: () => void }) {
   const { trip, first } = props;
@@ -206,6 +258,7 @@ export function TripCard(props: { trip: Trip; first: boolean; village: boolean; 
             <div className="person__sub">{car(d)}</div>
           </div>
         </div>
+        <CarPhotos tripId={trip.id} count={d.photoCount ?? 0} label={car(d)} />
         <div className="trip__meta">
           <div>{[seats(trip.seatsFree), TRUNK[trip.trunk], d.childSeat ? 'детское кресло' : null].filter(Boolean).join(' · ')}</div>
           {trip.pickupMode !== 'door' && trip.pickupPoints.length > 0 && <div>Сбор: {trip.pickupPoints.join(', ')}</div>}
