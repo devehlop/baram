@@ -23,18 +23,18 @@
   --c-teen-bg: #FFE4D2;
   --c-teen-ink: #8A2E0A;
 
-  /* Шрифт */
+  /* Шрифт. Шкала как в Telegram UI kit: 28/24/20 заголовки, 17 текст, 15 вторичный (DESIGN.md §2.2). */
   --font: 'Onest', system-ui, sans-serif;
   --fs-logo: 36px;
-  --fs-h1: 32px;
-  --fs-title: 26px;
-  --fs-time: 30px;
-  --fs-price: 24px;
-  --fs-card: 19px;
-  --fs-button: 18px;
+  --fs-h1: 26px;
+  --fs-title: 22px;
+  --fs-time: 24px;
+  --fs-price: 20px;
+  --fs-card: 17px;
+  --fs-button: 17px;
   --fs-body: 17px;
   --fs-small: 15px;
-  --fs-label: 13px;
+  --fs-label: 15px;
 
   /* Отступы */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
@@ -43,18 +43,18 @@
   /* Радиусы */
   --r-badge: 8px;
   --r-chip: 10px;
-  --r-icon: 16px;
-  --r-button: 18px;
-  --r-card: 22px;
-  --r-tile: 24px;
+  --r-icon: 12px;
+  --r-button: 14px;
+  --r-card: 18px;
+  --r-tile: 20px;
 
-  /* Размеры */
-  --h-button: 60px;
-  --h-button-card: 56px;
-  --h-button-small: 44px;
-  --h-input: 48px;
-  --tap-min: 48px;
-  --h-tile: 140px;
+  /* Размеры. Кнопки как в Telegram UI kit (50 / 42 / 36); нажимаемое не меньше 44 — минимум Apple HIG (DESIGN.md §2.4). */
+  --h-button: 50px;
+  --h-button-card: 44px;
+  --h-button-small: 36px;
+  --h-input: 44px;
+  --tap-min: 44px;
+  --h-tile: 104px;
 
   /* Переопределение Telegram UI */
   --tgui--bg_color: var(--c-canvas);
@@ -87,7 +87,7 @@ a { color: var(--c-indigo); }
   display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
   width: 100%; height: var(--h-button);
   border: 0; border-radius: var(--r-button);
-  font-size: var(--fs-button); font-weight: 700; cursor: pointer;
+  font-size: var(--fs-button); font-weight: 600; cursor: pointer;
 }
 .btn--primary { background: var(--c-red); color: #FFFFFF; }
 .btn--confirm { background: var(--c-green); color: #FFFFFF; }
@@ -101,7 +101,7 @@ a { color: var(--c-indigo); }
   --c-on-green-soft: #E6EFE9;   /* вторичный текст на зелёной карточке */
   --c-ok-soft: #E3F1E9;         /* подложка статуса «всё хорошо» */
   --c-ok-ink: #0F5C39;
-  --r-button-card: 16px;
-  --r-button-small: 12px;
-  --r-option: 20px;
+  --r-button-card: 12px;
+  --r-button-small: 10px;
+  --r-option: 16px;
 }

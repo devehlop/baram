@@ -121,7 +121,7 @@ export function PageHeader(props: { title: string; sub?: string; onBack: () => v
 export function OptionCard(props: { title: string; sub?: string; icon: IconName; selected?: boolean; onClick: () => void }) {
   return (
     <button type="button" className="option" aria-pressed={!!props.selected} onClick={props.onClick}>
-      <span className="option__icon"><Icon name={props.icon} size={26} /></span>
+      <span className="option__icon"><Icon name={props.icon} size={20} /></span>
       <span className="option__text">
         <span className="option__title">{props.title}</span>
         {props.sub && <span className="option__sub">{props.sub}</span>}
@@ -134,7 +134,7 @@ export function MenuTile(props: { label: string; hint?: string; icon: IconName; 
   return (
     <button type="button" className={`tile${props.primary ? ' tile--primary' : ''}`} onClick={props.onClick}>
       <span className="tile__icon">
-        <Icon name={props.icon} size={34} />
+        <Icon name={props.icon} size={26} />
         {!!props.count && <span className="badge-count" aria-label={`Новых: ${props.count}`}>{props.count}</span>}
       </span>
       <span>
@@ -200,20 +200,23 @@ export function TripCard(props: { trip: Trip; first: boolean; village: boolean; 
           <div className="trip__price">{money(trip.price)}</div>
         </div>
         <div className="row">
-          <Avatar name={d.name} gold={!first} />
+          <Avatar name={d.name} />
           <div>
             <div className="person__name">{d.name}</div>
             <div className="person__sub">{car(d)}</div>
           </div>
         </div>
-        <div className="chips">
-          <Chip>{seats(trip.seatsFree)}</Chip>
-          <Chip>{TRUNK[trip.trunk]}</Chip>
-          {trip.pickupMode !== 'door' && trip.pickupPoints.length > 0 && <Chip>сбор: {trip.pickupPoints.join(', ')}</Chip>}
-          {trip.villages && <Chip kind="gold">деревни — доплата по договорённости</Chip>}
-          {!trip.villages && props.village && <Chip kind="teen">в деревни не заезжает</Chip>}
-          {d.childSeat ? <Chip>детское кресло</Chip> : props.needChildSeat && <Chip kind="teen">нет детского кресла</Chip>}
+        <div className="trip__meta">
+          <div>{[seats(trip.seatsFree), TRUNK[trip.trunk], d.childSeat ? 'детское кресло' : null].filter(Boolean).join(' · ')}</div>
+          {trip.pickupMode !== 'door' && trip.pickupPoints.length > 0 && <div>Сбор: {trip.pickupPoints.join(', ')}</div>}
         </div>
+        {(trip.villages || (!trip.villages && props.village) || (!d.childSeat && props.needChildSeat)) && (
+          <div className="chips">
+            {trip.villages && <Chip kind="gold">Деревни — доплата по договорённости</Chip>}
+            {!trip.villages && props.village && <Chip kind="teen">В деревни не заезжает</Chip>}
+            {!d.childSeat && props.needChildSeat && <Chip kind="teen">Нет детского кресла</Chip>}
+          </div>
+        )}
         <Button size="card" variant={first ? 'primary' : 'outline-green'} onClick={props.onPick}>Еду с ним</Button>
       </div>
       {first && <ChuvashBand height={14} background="#FFFFFF" />}
@@ -225,7 +228,7 @@ export function Loading({ text = 'Загружаем…' }: { text?: string }) {
   return (
     <div className="screen">
       <div className="loading">
-        <Rosette size={64} />
+        <Rosette size={44} />
         <div className="muted">{text}</div>
       </div>
     </div>
