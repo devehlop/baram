@@ -96,28 +96,22 @@ describe('«Поделиться рейсом» и бронь по ссылке'
     expect(p.last()).toContain('17:30');
     expect(p.buttons()).toContain('🚗 Еду с ним');
 
-    // «Еду с ним»: без шага «Когда?» и без поиска.
+    // «Еду с ним»: без шагов «Куда» и «Когда» и без поиска — сразу «откуда».
     await p.press('Еду с ним');
-    expect(p.fresh()).toContain('Бронируем место в рейсе');
-    expect(p.last()).toContain('Шаг 1 из 6');
-    await p.press('Я сам');
-    expect(p.last()).toContain('Откуда едете?');
+    expect(p.last()).toContain('Откуда вас забрать?');
     expect(p.buttons()).toContain('Буинск');
     expect(p.buttons()).not.toContain('Казань'); // рейс идёт из Буинска
     await p.press('Буинск');
     await p.text('ул. Ленина, 12');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    expect(p.last()).toContain('Шаг 4 из 6');
+    expect(p.last()).toContain('Проверьте и бронируйте');
+    expect(p.last()).toContain('вт, 10 ноября в 17:30');
+    await p.press('💺');
     expect(p.buttons()).toContain('3');
     expect(p.buttons()).not.toContain('4'); // мест в рейсе всего 3
     await p.press('2');
-    await p.press('Нет');
-    await p.press('Только сумка');
-    await p.press('Пропустить');
-    expect(p.last()).toContain('Проверьте поездку');
-    expect(p.last()).toContain('вт, 10 ноября в 17:30');
-    await p.press('Всё верно');
+    await p.press('Забронировать');
     expect(p.fresh()).toContain('Заявка на бронь отправлена водителю');
 
     const [b] = await listTripBookings(trip.id);
@@ -135,31 +129,22 @@ describe('«Поделиться рейсом» и бронь по ссылке'
 
     await p.text(`/start t_${trip.id}`);
     await p.press('Еду с ним');
-    await p.press('Я сам');
     await p.press('Буинск');
     await p.text('ул. Ленина, 12');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    await p.press('1');
-    await p.press('Нет');
-    await p.press('Только сумка');
 
     // Последнее место забрал другой пассажир.
     await other.text(`/start t_${trip.id}`);
     await other.press('Еду с ним');
-    await other.press('Я сам');
     await other.press('Буинск');
     await other.text('ул. Мира, 3');
     await other.press('Казань');
     await other.text('ул. Баумана, 1');
-    await other.press('1');
-    await other.press('Нет');
-    await other.press('Только сумка');
-    await other.press('Пропустить');
-    await other.press('Всё верно');
+    await other.press('Забронировать');
     expect((await getTrip(trip.id))!.seatsFree).toBe(0);
 
-    await p.press('Пропустить');
+    await p.press('Забронировать');
     expect(p.fresh()).toContain('Этот рейс забронировать уже нельзя');
     expect(p.last()).toContain('18:00');
     expect(p.buttons().some((x) => x.includes('18:00 · Рамиль'))).toBe(true);
@@ -183,16 +168,11 @@ describe('канал и админ', () => {
     await registerVia(102, 's_aigul', 'Ляйсан');
     const p = await registerVia(103, `t_${trip.id}`, 'Динар');
     await p.press('Еду с ним');
-    await p.press('Я сам');
     await p.press('Буинск');
     await p.text('ул. Мира, 3');
     await p.press('Казань');
     await p.text('ул. Баумана, 1');
-    await p.press('1');
-    await p.press('Нет');
-    await p.press('Только сумка');
-    await p.press('Пропустить');
-    await p.press('Всё верно');
+    await p.press('Забронировать');
 
     const admin = h.user(ADMIN_ID);
     await admin.text('/admin');

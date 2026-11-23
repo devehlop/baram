@@ -36,32 +36,33 @@ describe('главный сценарий: рейс → поиск → брон�
     const [trip] = await listDriverTrips(await dbId(201));
     expect(trip).toMatchObject({ route: 'Буинск → Казань', seatsFree: 3, price: 500 });
 
-    // Пассажир отвечает на 7 вопросов.
+    // Пассажир: куда → когда → рейс → откуда и куда забрать → карточка → «Забронировать».
     await p.text('🚗 Найти поездку');
-    expect(p.last()).toContain('Шаг 1 из 7');
-    await p.press('Я сам');
-    expect(p.last()).toContain('Откуда едете?');
-    await p.press('Буинск');
-    await p.text('ул. Ленина, 12');
     expect(p.last()).toContain('Куда едете?');
-    expect(p.buttons()).not.toContain('Буинск'); // обратно в тот же город не едем
-    await p.press('Казань');
-    await p.text('ул. Деловая, 7');
+    await p.press('Буинск → Казань');
     await p.press('Сегодня');
-    await p.press('Вечером');
-    await p.press('1');
-    await p.press('Нет');
-    await p.press('Только сумка');
-    await p.press('Пропустить');
-    expect(p.last()).toContain('Нашёлся 1 рейс');
+    expect(p.last()).toContain('1 рейс на этот день');
     expect(p.last()).toContain('Lada Largus, 2019, белый');
     expect(p.last()).not.toContain('А123ВС116'); // госномер — только после подтверждения
     await p.press('17:00 · Ильдар');
-    expect(p.last()).toContain('Проверьте поездку');
+    expect(p.last()).toContain('Откуда вас забрать?');
+    expect(p.buttons()).not.toContain('Казань'); // только города стороны отправления
+    await p.press('Буинск');
+    await p.text('ул. Ленина, 12');
+    expect(p.last()).toContain('Куда вас отвезти?');
+    expect(p.buttons()).not.toContain('Буинск');
+    await p.press('Казань');
+    await p.text('ул. Деловая, 7');
+    // Всё остальное заполнено самым частым ответом: я, 1 место, сумка, без ребёнка.
+    expect(p.last()).toContain('Проверьте и бронируйте');
+    expect(p.last()).toContain('Едет: Я сам');
+    expect(p.last()).toContain('1 место · только сумка или рюкзак');
     expect(p.last()).toContain('500 ₽');
-    await p.press('Всё верно');
-    expect(p.fresh()).toContain('Заявка на бронь отправлена водителю');
+    await p.press('Забронировать');
+    expect(p.last()).toContain('Заявка на бронь отправлена водителю');
     expect((await getTrip(trip!.id))!.seatsFree).toBe(2); // место удержано сразу
+    // Одно окно: весь поиск прошёл в одном сообщении, ответы человека убраны из чата.
+    expect(h.tg.of(101)).toHaveLength(1);
 
     // Водитель принимает.
     expect(d.last()).toContain('Новая бронь');
@@ -101,7 +102,7 @@ describe('главный сценарий: рейс → поиск → брон�
     expect(b).toMatchObject({ status: 'completed', passengerName: 'Айгуль' });
   });
 
-  it('«Назад» и «Исправить» у пассажира; «Мои поездки», «Обратно»', async () => {
+  it('«Назад» и правка в карточке; «Мои поездки», «Обратно», «Как в прошлый раз»', async () => {
     const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     const { postTrip } = await import('./helpers.js');
@@ -109,56 +110,60 @@ describe('главный сценарий: рейс → поиск → брон�
     await postTrip(201, { fromSide: 'b', dayOffset: 2, time: '18:00' });
 
     await p.text('🚗 Найти поездку');
-    await p.press('Я сам');
+    await p.press('Буинск → Казань');
+    await p.press('Сегодня');
+    await p.press('17:00 · Ильдар');
     await p.press('Буинск');
     await p.text('ул. Ленина, 12');
     await p.press('Назад'); // с вопроса «Куда» — обратно на «Откуда»
-    expect(p.last()).toContain('Откуда едете?');
+    expect(p.last()).toContain('Откуда вас забрать?');
     await p.press('Буинск');
     await p.text('ул. Ленина, 14');
     await p.press('Казань');
     await p.text('ул. Деловая, 7');
-    await p.press('Сегодня');
-    await p.press('Точное время');
-    await p.text('17.10');
+
+    // Правка прямо в карточке: места, багаж, комментарий.
+    await p.press('💺');
     await p.press('2');
-    await p.press('Нет');
-    await p.press('Чемодан');
-    await p.text('Позвоните заранее');
-    await p.press('17:00 · Ильдар');
     expect(p.last()).toContain('1 000 ₽');
-    await p.press('Исправить');
-    await p.press('Сколько мест');
+    await p.press('🧳');
+    await p.press('Чемодан');
+    await p.press('💬');
+    await p.text('Позвоните заранее');
+    expect(p.last()).toContain('Позвоните заранее');
+    expect(p.last()).toContain('чемодан или большая сумка');
+    await p.press('💺');
     await p.press('1');
-    await p.press('Нет');
-    await p.press('17:00 · Ильдар'); // после исправления — снова список рейсов
     expect(p.last()).toContain('500 ₽');
     expect(p.last()).toContain('ул. Ленина, 14');
-    await p.press('Всё верно');
-    expect(p.all()).toContain('Запомнить адрес');
+    await p.press('Забронировать');
+    expect(p.last()).toContain('Запомнить адрес');
 
-    // Сохраняем адрес «откуда» как «Дом».
+    // Сохраняем адрес «откуда» как «Дом» — и возвращаемся к карточке брони.
     await p.press('Буинск, ул. Ленина, 14');
     await p.press('Дом');
     expect(p.last()).toContain('Сохранено: Дом');
+    expect(p.last()).toContain('ул. Деловая, 7');
 
     await d.press('Принять');
 
-    // «Мои поездки» → «Обратно»: адреса меняются местами, спрашиваем только день и время.
+    // «Мои поездки» → «Обратно»: адреса меняются местами, спрашиваем только день и рейс.
     await p.text('🔁 Мои поездки');
     expect(p.buttons().some((x) => x.includes('Буинск → Казань'))).toBe(true);
     await p.press('Буинск → Казань');
     await p.press('Обратно');
-    expect(p.fresh()).toContain('Казань, ул. Деловая, 7 → Буинск, ул. Ленина, 14');
-    await p.press('Чт 12.11');
-    await p.press('Вечером');
     expect(p.last()).toContain('Казань → Буинск');
+    await p.press('Чт 12.11');
     await p.press('18:00 · Ильдар');
-    expect(p.last()).toContain('Проверьте поездку');
+    expect(p.last()).toContain('Проверьте и бронируйте');
+    expect(p.last()).toContain('Откуда: Казань, ул. Деловая, 7');
 
-    // Сохранённый адрес — первой кнопкой в новом поиске.
+    // Новый поиск: первой кнопкой — «Как в прошлый раз», а сохранённый адрес — первым на шаге «Откуда».
     await p.text('🚗 Найти поездку');
-    await p.press('Я сам');
+    expect(p.buttons()[0]).toContain('Как в прошлый раз');
+    await p.press('Буинск → Казань');
+    await p.press('Сегодня');
+    await p.press('17:00 · Ильдар');
     expect(p.buttons()[0]).toContain('Дом · Буинск, ул. Ленина, 14');
   });
 });

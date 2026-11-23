@@ -44,16 +44,17 @@ passenger.callbackQuery('p:find', async (ctx) => {
   await findTrip(ctx);
 });
 
-async function bookingScreen(ctx: MyContext, id: number): Promise<void> {
+/** Бронь пассажира. notice — строка над карточкой (например, «Адрес сохранён»). */
+async function bookingScreen(ctx: MyContext, id: number, notice?: string): Promise<void> {
   const b = await getBooking(id);
   if (!b || b.booker?.id !== ctx.user!.id) return toast(ctx, t('not-found'), true);
   const trip = (await getTrip(b.tripId))!;
   const s = await loadSettings();
   await show(
     ctx,
-    bookingForPassenger(b, trip, s.big_baggage_prepay),
+    `${notice ? `${notice}\n\n` : ''}${bookingForPassenger(b, trip, s.big_baggage_prepay)}`,
     kb([
-      [CANCELLABLE.includes(b.status) && { text: t('btn-cancel-booking'), data: `p:x:${b.id}` }],
+      [CANCELLABLE.includes(b.status) && { text: t('btn-cancel-booking'), data: `p:x:${b.id}`, style: 'danger' }],
       [{ text: t('btn-repeat'), data: `p:rep:${b.id}` }, { text: t('btn-reverse'), data: `p:rev:${b.id}` }],
       [{ text: t('btn-complain'), data: `p:cmp:${b.id}` }],
       [{ text: t('btn-to-my-trips-passenger'), data: 'p:trips' }],
@@ -172,7 +173,8 @@ passenger.callbackQuery(/^p:sal:(\d+):([ft]):(\d)$/, async (ctx) => {
   const label = ADDRESS_LABELS[num(ctx, 3)];
   if (!b || b.booker?.id !== ctx.user!.id || !place || !label) return toast(ctx, t('not-found'), true);
   await saveAddress({ userId: ctx.user!.id, label: t(label), localityId: place.localityId, address: place.address, lat: place.lat, lon: place.lon });
-  await show(ctx, t('save-address-done', { label: t(label), address: `${esc(place.city)}, ${esc(place.address)}` }));
+  // Возвращаемся к карточке брони — адрес сохранён, всё остальное на месте.
+  await bookingScreen(ctx, b.id, t('save-address-done', { label: t(label), address: `${esc(place.city)}, ${esc(place.address)}` }));
 });
 
 async function savedScreen(ctx: MyContext): Promise<void> {
