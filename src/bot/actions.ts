@@ -384,12 +384,18 @@ export async function fileComplaint(input: {
   kind?: 'complaint' | 'wrong_person';
 }): Promise<ComplaintView> {
   let against: number | null = null;
+  let bookingId: number | null = null;
   if (input.bookingId) {
     const b = await getBooking(input.bookingId);
     const trip = b && (await getTrip(b.tripId));
-    if (b && trip) against = trip.driverId === input.fromUserId ? (b.booker?.id ?? null) : trip.driverId;
+    // К жалобе привязываем только свою бронь: водителя рейса или заказчика. Чужой номер брони игнорируем.
+    const mine = b && trip && (trip.driverId === input.fromUserId || b.booker?.id === input.fromUserId || b.passengerUserId === input.fromUserId);
+    if (b && trip && mine) {
+      bookingId = b.id;
+      against = trip.driverId === input.fromUserId ? (b.booker?.id ?? null) : trip.driverId;
+    }
   }
-  const c = await createComplaint({ ...input, againstUserId: against });
+  const c = await createComplaint({ ...input, bookingId, againstUserId: against });
   await notifyAdmins(
     `${c.kind === 'wrong_person' ? '🚨 ' : ''}${complaintCard(c)}`,
     kb([[{ text: t('btn-open'), data: `a:c:${c.id}` }]]),

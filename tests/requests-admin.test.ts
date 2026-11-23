@@ -178,6 +178,7 @@ describe('админ в боте', () => {
     const admin = h.user(ADMIN_ID);
     const d = h.user(202);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Рамиль');
     await d.contact('+79170000009');
