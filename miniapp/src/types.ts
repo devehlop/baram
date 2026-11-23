@@ -76,7 +76,8 @@ export interface Trip {
     childSeat: boolean;
     badge: boolean;
     priority: boolean;
-    photo: string | null;
+    /** Сколько фото машины в анкете водителя: /api/trips/<id>/photos/<0…n-1>. */
+    photoCount?: number;
     /** Рейтинг водителя; null — оценок пока мало. */
     rating: { avg: number; count: number } | null;
     // Открываются после подтверждения брони:
@@ -168,9 +169,12 @@ export interface BoardRoute {
   label: string;
 }
 
-/** Заявка на доске — без имени, телефона и адреса. */
+/** Заявка на доске — имя пассажира без телефона и адреса. */
 export interface PublicRequest {
   id: number;
+  name: string;
+  /** Пассажир едет сам: есть смысл грузить фото его профиля. */
+  avatar: boolean;
   route: string;
   day: string;
   timeKind: TimeKind;

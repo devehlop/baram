@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, ApiError } from '../api';
-import { Avatar, Button, ErrorNote, Loading, PageHeader, Screen, StatusTimeline, SummaryRows } from '../components';
+import { Avatar, Button, CarPhotos, ErrorNote, Loading, PageHeader, Screen, StatusTimeline, SummaryRows } from '../components';
 import { BAGGAGE, car, dateTime, money, phone, rating, seats, STATUS } from '../format';
 import { errorText, useLoad, useNav } from '../nav';
 import { ChuvashBand } from '../Ornaments';
@@ -63,13 +63,14 @@ export function Booking({ id }: { id: number }) {
 
       <div className="card">
         <div className="row">
-          <Avatar name={d.name} large />
+          <Avatar name={d.name} large src={`/trips/${trip.id}/avatar`} />
           <div>
             <div className="person__name" style={{ fontSize: 18 }}>{d.name}{d.badge ? ' · проверен' : ''}</div>
             <div className="person__sub">{car(d)}</div>
             {d.rating && <div className="person__sub">{rating(d.rating)}</div>}
           </div>
         </div>
+        <CarPhotos tripId={trip.id} count={d.photoCount ?? 0} label={car(d)} />
         {d.plate ? <div className="plate">{d.plate}</div> : <div className="small muted">Номер машины и телефон появятся, когда водитель подтвердит бронь.</div>}
       </div>
 

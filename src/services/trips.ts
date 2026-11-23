@@ -67,7 +67,8 @@ export interface TripView {
     childSeat: boolean;
     payPhone: string;
     payBank: string;
-    photo: string | null;
+    /** file_id фото машины из анкеты, по порядку: спереди, сбоку, салон. */
+    photos: string[];
     badge: boolean;
     priority: boolean;
     /** Рейтинг водителя; null — оценок пока меньше порога из настроек. */
@@ -130,7 +131,7 @@ export async function toTripViews(rows: Joined[]): Promise<TripView[]> {
       childSeat: d.childSeat,
       payPhone: d.payPhone,
       payBank: d.payBank,
-      photo: d.carPhotos[0] ?? null,
+      photos: d.carPhotos,
       badge: privs.get(u.id)?.has('verified_badge') ?? false,
       priority: privs.get(u.id)?.has('priority') ?? false,
       rating: shown(u.id),
