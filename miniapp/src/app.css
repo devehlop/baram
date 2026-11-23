@@ -139,6 +139,28 @@ button.green { border: 0; text-align: left; width: 100%; }
 }
 .avatar--gold { background: var(--c-gold); color: var(--c-ink); }
 .avatar--lg { width: 48px; height: 48px; font-size: 18px; }
+.avatar { overflow: hidden; }
+.avatar__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ——— Фото машины ——— */
+.car-photos { display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--sp-4)); padding: 0 var(--sp-4); }
+.car-photos::-webkit-scrollbar { display: none; }
+.car-photos__item { flex: 0 0 auto; border: 0; padding: 0; background: none; border-radius: var(--r-icon); overflow: hidden; cursor: pointer; }
+.car-photo { display: block; width: 104px; height: 78px; object-fit: cover; background: var(--c-surface-2); }
+.car-photo--empty { animation: car-photo-wait 1.2s ease-in-out infinite alternate; }
+@keyframes car-photo-wait { from { opacity: 1; } to { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .car-photo--empty { animation: none; } }
+
+.viewer { position: fixed; inset: 0; z-index: 100; background: #120B08; color: #FFFFFF; display: flex; flex-direction: column; }
+.viewer__head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.viewer__title { flex: 1; font-size: var(--fs-body); font-weight: 600; }
+.viewer__close { width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: inherit; display: flex; align-items: center; justify-content: center; }
+.viewer__strip { flex: 1; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.viewer__strip::-webkit-scrollbar { display: none; }
+.viewer__page { flex: 0 0 100%; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; padding: var(--sp-2); }
+.viewer__img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--r-icon); }
+.viewer__img.car-photo--empty { width: 100%; height: 60%; background: rgba(255,255,255,.08); }
+.viewer__hint { text-align: center; font-size: var(--fs-small); color: rgba(255,255,255,.7); padding: var(--sp-3) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom)); }
 .person__name { font-size: var(--fs-body); font-weight: 600; }
 .person__sub { font-size: var(--fs-small); color: var(--c-ink-muted); }
 

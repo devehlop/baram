@@ -14,6 +14,7 @@ import {
   removeIncoming,
   screenOf,
   send,
+  sendPhotos,
   setScreen,
   type Btn,
   type Markup,
@@ -133,6 +134,22 @@ export class Wizard {
     this.notice = this.notice ? `${this.notice}\n\n${text}` : text;
     const notice = this.notice;
     this.panel = await this.ext(() => this.paint(notice));
+  }
+
+  /**
+   * Фото отдельными сообщениями. Окно убирается и следующим вопросом приходит заново под фото —
+   * чтобы отвечать, не листая чат вверх.
+   */
+  async photos(fileIds: string[], caption?: string): Promise<void> {
+    await this.ext(async () => {
+      const id = this.panel;
+      if (id) {
+        await deleteMessage(this.chatId, id);
+        if (screenOf(this.chatId) === id) setScreen(this.chatId, null);
+      }
+      await sendPhotos(this.chatId, fileIds, caption);
+    });
+    this.panel = null;
   }
 
   /**
