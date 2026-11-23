@@ -54,6 +54,8 @@ export const users = pgTable('users', {
   activeRole: text('active_role').$type<Role>().notNull().default('passenger'),
   restriction: text('restriction').$type<Restriction>().notNull().default('none'),
   restrictionReason: text('restriction_reason'),
+  /** Откуда пришёл человек: метка из ссылки t.me/<бот>?start=… при первом запуске. Не перезаписывается. */
+  source: text('source'),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
