@@ -17,13 +17,22 @@ export function cleanName(raw: string): string | null {
 }
 
 /**
- * Первый запуск: «Вы пассажир или водитель?» → «Как вас зовут?» → телефон кнопкой.
+ * Первый запуск: согласие на обработку данных → «Вы пассажир или водитель?» → «Как вас зовут?» → телефон кнопкой.
  * Водитель сразу продолжает анкетой.
  */
 export async function registration(conv: MyConversation, ctx: Context): Promise<void> {
   const chatId = ctx.chat!.id;
   const from = ctx.from!;
   const w = new Wizard(conv, chatId);
+
+  // Согласие на обработку персональных данных — до того, как спрашиваем имя и телефон.
+  const consent = await w.ask({
+    text: t('reg-consent'),
+    rows: column([{ text: t('reg-consent-yes'), data: 'yes' }]),
+    back: false,
+    home: false,
+  });
+  if (consent.kind !== 'btn' || consent.data !== 'yes') return;
 
   const roleAns = await w.ask({
     text: t('reg-welcome'),

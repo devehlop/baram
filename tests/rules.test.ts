@@ -72,6 +72,7 @@ describe('защита от спама при выкладке рейса', () =
   it('водителю без одобренной анкеты рейсы недоступны', async () => {
     const d = h.user(202);
     await d.text('/start');
+    await d.press('Согласен');
     await d.press('Я водитель');
     await d.text('Рамиль');
     await d.contact('+79170000009');
