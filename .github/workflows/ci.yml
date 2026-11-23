@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  # Кнопка «Run workflow» во вкладке Actions: повторить деплой главной ветки вручную.
+  workflow_dispatch:
 
 jobs:
   check:
@@ -24,3 +26,35 @@ jobs:
         run: npm run build
       - name: Mini App — проверка типов и сборка
         run: npm run miniapp:build
+
+  # Деплой на сервер после слияния в главную ветку, только если проверки прошли.
+  # Настройка сервера и секретов — docs/DEPLOY.md, раздел «Автодеплой из GitHub».
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/claude/baram-telegram-bot-v1-q2xmp9' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: production
+    # Деплои идут по одному; новый ждёт, пока закончится текущий, и не обрывает его посередине.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    timeout-minutes: 30
+    steps:
+      - name: Деплой на сервер
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::warning::Автодеплой не настроен: нет секретов DEPLOY_HOST, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS. См. docs/DEPLOY.md, «Автодеплой из GitHub»."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # На сервере этот ключ может запускать только scripts/deploy.sh; SHA уходит ему аргументом.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 -o ServerAliveInterval=30 \
+            "root@$DEPLOY_HOST" "$GITHUB_SHA"
