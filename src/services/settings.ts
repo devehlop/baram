@@ -22,8 +22,6 @@ export const NUMERIC_SETTINGS = {
   search_exact_minutes: 60, // «точное время»: ± минут
   trip_autoclose_hours: 8, // рейс без «Доехали» закрывается сам
   driver_late_cancel_hours: 3, // отмена рейса с бронями позже срока — сигнал админу
-  price_min: 100,
-  price_max: 5000,
   rating_min_count: 3, // со скольких оценок рейтинг показывается всем
   rating_alert_below: 4, // рейтинг опустился ниже — сообщаем админу (можно дробное, например 4.5)
 } as const;

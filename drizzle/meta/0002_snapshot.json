@@ -1,5 +1,5 @@
 {
-  "id": "24f4a733-e2d9-4fe2-9af1-0788a03eb08e",
+  "id": "6efc4156-4a5d-4ddf-a3af-d9081feb5adc",
   "prevId": "a5fbd575-963a-4613-956e-cca55856f89e",
   "version": "7",
   "dialect": "postgresql",
@@ -663,6 +663,13 @@
           "notNull": true,
           "default": 120
         },
+        "price": {
+          "name": "price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 800
+        },
         "channel_id": {
           "name": "channel_id",
           "type": "text",
@@ -1057,151 +1064,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "granted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.ratings": {
-      "name": "ratings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "booking_id": {
-          "name": "booking_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target": {
-          "name": "target",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_user_id": {
-          "name": "from_user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_user_id": {
-          "name": "to_user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stars": {
-          "name": "stars",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "comment": {
-          "name": "comment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "ratings_booking_target": {
-          "name": "ratings_booking_target",
-          "columns": [
-            {
-              "expression": "booking_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "target",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ratings_to": {
-          "name": "ratings_to",
-          "columns": [
-            {
-              "expression": "to_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "target",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "ratings_booking_id_bookings_id_fk": {
-          "name": "ratings_booking_id_bookings_id_fk",
-          "tableFrom": "ratings",
-          "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ratings_from_user_id_users_id_fk": {
-          "name": "ratings_from_user_id_users_id_fk",
-          "tableFrom": "ratings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "from_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ratings_to_user_id_users_id_fk": {
-          "name": "ratings_to_user_id_users_id_fk",
-          "tableFrom": "ratings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "to_user_id"
           ],
           "columnsTo": [
             "id"

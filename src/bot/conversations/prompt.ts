@@ -2,10 +2,10 @@ import type { Context, InlineKeyboard } from 'grammy';
 import { isAdminTg } from '../../app.js';
 import type { Side } from '../../db/schema.js';
 import { t } from '../../i18n.js';
-import { esc, fmtPhone, normalizePhone } from '../../lib/format.js';
+import { esc, fmtPhone, money, normalizePhone } from '../../lib/format.js';
 import { getBooking, setPhoneBookingData } from '../../services/bookings.js';
 import { resolveComplaint, setComplaintNote } from '../../services/complaints.js';
-import { addVillage, setChannel, setTravelMinutes } from '../../services/directions.js';
+import { addVillage, setChannel, setDirectionPrice, setTravelMinutes } from '../../services/directions.js';
 import { DECIMAL_SETTINGS, isNumericKey, isSettingKey, setSetting } from '../../services/settings.js';
 import { getTrip } from '../../services/trips.js';
 import { setRatingComment } from '../../services/ratings.js';
@@ -29,6 +29,7 @@ export type PromptArgs =
   | { kind: 'adminVillage'; id: number; side: Side }
   | { kind: 'adminChannel'; id: number }
   | { kind: 'adminTravel'; id: number }
+  | { kind: 'adminPrice'; id: number; route?: string }
   | { kind: 'adminNote'; id: number }
   | { kind: 'adminResolve'; id: number };
 
@@ -44,6 +45,13 @@ export function parseNamePhone(text: string): { name: string; phone: string } | 
 }
 
 const nonNegativeInt = (v: string) => /^\d{1,6}$/.test(v);
+/** «800», «800 ₽», «1 000» → 800 / 1000; вне 100–10 000 — null. */
+export const parsePrice = (v: string): number | null => {
+  if (!/^\s*\d[\d\s]*(₽|р|руб\.?|рублей)?\s*$/i.test(v)) return null;
+  const n = Number(v.replace(/\D/g, ''));
+  return n >= 100 && n <= 10_000 ? n : null;
+};
+const validPrice = (v: string) => parsePrice(v) !== null;
 const between = (min: number, max: number) => (v: string) =>
   v.length >= min && v.length <= max ? null : t('hint-text-length', { min, max });
 
@@ -99,6 +107,8 @@ function question(a: PromptArgs): Question {
       };
     case 'adminTravel':
       return { text: t('adm-travel-ask'), validate: (v) => (nonNegativeInt(v) && Number(v) >= 10 ? null : t('adm-number-hint')) };
+    case 'adminPrice':
+      return { text: t('adm-price-ask', { route: a.route ?? '' }), validate: (v) => (validPrice(v) ? null : t('adm-price-hint')) };
     case 'adminNote':
       return { text: t('adm-note-ask'), validate: between(2, 1000) };
     case 'adminResolve':
@@ -221,6 +231,12 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
         case 'adminTravel': {
           await setTravelMinutes(args.id, Number(text));
           await say(t('done'), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
+          return;
+        }
+        case 'adminPrice': {
+          const price = parsePrice(text)!;
+          await setDirectionPrice(args.id, price);
+          await say(t('adm-price-saved', { route: esc(args.route ?? ''), price: money(price) }), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
           return;
         }
         case 'adminNote': {

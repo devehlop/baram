@@ -103,9 +103,9 @@ describe('канал: сводный пост «Рейсы на <день>»', (
     const posts = () => h.tg.messages.filter((m) => m.chatId === -1001234567890);
     expect(posts().length).toBe(1);
     expect(posts()[0]!.text).toContain('Рейсы на вт, 10 ноября');
-    expect(posts()[0]!.text).toContain('17:00</b> · Ильдар · Lada Largus · 3 места · 500 ₽');
+    expect(posts()[0]!.text).toContain('17:00</b> · Ильдар · Lada Largus · 3 места · 800 ₽');
 
-    await postTrip(202, { time: '18:00', fromSide: 'b', price: 600 });
+    await postTrip(202, { time: '18:00', fromSide: 'b' });
     expect(posts().length).toBe(1); // тот же пост, обновлён
     expect(posts()[0]!.text).toContain('Казань → Буинск');
     expect(posts()[0]!.text).toContain('18:00</b> · Рамиль');

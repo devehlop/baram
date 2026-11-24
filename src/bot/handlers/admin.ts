@@ -1,11 +1,11 @@
 import { Composer } from 'grammy';
 import type { PrivilegeKind, Side } from '../../db/schema.js';
 import { t } from '../../i18n.js';
-import { cut, esc, fmtPhone } from '../../lib/format.js';
+import { cut, esc, fmtPhone, money } from '../../lib/format.js';
 import { fmtDateTime, now } from '../../lib/time.js';
 import { listPendingAdminBookings } from '../../services/bookings.js';
 import { getComplaint, listOpenComplaints, takeComplaint } from '../../services/complaints.js';
-import { cityOf, deactivateVillage, listDirections, listLocalities } from '../../services/directions.js';
+import { cityOf, deactivateVillage, getDirection, listDirections, listLocalities } from '../../services/directions.js';
 import { getDriver, grantPrivilege, listDriversByStatus, revokePrivilege } from '../../services/drivers.js';
 import { lowRatings, ratingOf } from '../../services/ratings.js';
 import { candidateDrivers, getRequest, listEscalatedRequests } from '../../services/requests.js';
@@ -340,6 +340,7 @@ guarded.callbackQuery('a:set', async (ctx) => {
       ...SETTING_KEYS.map((key) => [{ text: cut(`${t(`setting-${key}`)}: ${s[key] === '' ? '—' : s[key]}`, 60), data: `a:set:${key}` }]),
       ...dirs.flatMap((d) => [
         [{ text: cut(`${t('adm-channel-of', { route: `${d.cityA} ⇄ ${d.cityB}` })}: ${d.channelId ?? '—'}`, 60), data: `a:ch:${d.id}` }],
+        [{ text: cut(`${t('adm-price-of', { route: `${d.cityA} ⇄ ${d.cityB}` })}: ${money(d.price)}`, 60), data: `a:pr:${d.id}` }],
         [{ text: cut(`${t('adm-travel-of', { route: `${d.cityA} ⇄ ${d.cityB}` })}: ${d.travelMinutes}`, 60), data: `a:tm:${d.id}` }],
       ]),
       menuBack(),
@@ -353,6 +354,12 @@ guarded.callbackQuery(/^a:set:([a-z_]+)$/, async (ctx) => {
 guarded.callbackQuery(/^a:(ch|tm):(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await enter(ctx, 'prompt', { kind: ctx.match[1] === 'ch' ? 'adminChannel' : 'adminTravel', id: num(ctx, 2) });
+});
+guarded.callbackQuery(/^a:pr:(\d+)$/, async (ctx) => {
+  const d = await getDirection(num(ctx));
+  if (!d) return toast(ctx, t('not-found'), true);
+  await ctx.answerCallbackQuery();
+  await enter(ctx, 'prompt', { kind: 'adminPrice', id: d.id, route: `${d.cityA} ⇄ ${d.cityB}` });
 });
 
 // ——— Деревни ———

@@ -32,7 +32,6 @@ export interface TripInput {
   villagesNote: string | null;
   seats: number;
   trunk: Trunk;
-  price: number;
 }
 
 /** Рейс вместе с водителем — в виде, пригодном для карточек и для хранения в сценарии (без Date). */
@@ -76,7 +75,7 @@ export interface TripView {
   };
 }
 
-export type TripProblem = 'not_approved' | 'past' | 'horizon' | 'limit' | 'duplicate' | 'overlap' | 'price' | 'seats';
+export type TripProblem = 'not_approved' | 'past' | 'horizon' | 'limit' | 'duplicate' | 'overlap' | 'seats';
 
 export const ACTIVE_TRIP: TripStatus[] = ['published', 'departed'];
 
@@ -179,7 +178,6 @@ export async function validateTrip(input: TripInput): Promise<TripProblem | null
     .innerJoin(users, eq(users.id, drivers.userId))
     .where(eq(drivers.userId, input.driverId));
   if (!driver || driver.d.status !== 'approved' || driver.u.restriction === 'blocked') return 'not_approved';
-  if (input.price < s.price_min || input.price > s.price_max) return 'price';
   if (input.seats < 1 || input.seats > driver.d.seats) return 'seats';
   if (input.departsAt <= now()) return 'past';
 
@@ -215,6 +213,9 @@ export async function validateTrip(input: TripInput): Promise<TripProblem | null
 export async function createTrip(input: TripInput): Promise<{ trip?: TripView; problem?: TripProblem }> {
   const problem = await validateTrip(input);
   if (problem) return { problem };
+  // Цену водитель не выбирает: она одна на направление и задаётся админом.
+  const [dir] = await app.db.select({ price: directions.price }).from(directions).where(eq(directions.id, input.directionId));
+  if (!dir) return { problem: 'not_approved' };
   const [row] = await app.db
     .insert(trips)
     .values({
@@ -229,7 +230,7 @@ export async function createTrip(input: TripInput): Promise<{ trip?: TripView; p
       seatsTotal: input.seats,
       seatsFree: input.seats,
       trunk: input.trunk,
-      price: input.price,
+      price: dir.price,
       createdAt: now(),
     })
     .returning();

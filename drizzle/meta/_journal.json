@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1795477470665,
-      "tag": "0002_ratings",
+      "when": 1795477056788,
+      "tag": "0002_direction_price",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795478761607,
+      "tag": "0003_ratings",
       "breakpoints": true
     }
   ]

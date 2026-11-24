@@ -28,13 +28,12 @@ describe('главный сценарий: рейс → поиск → брон�
     await d.press('Нет');
     await d.press('3');
     await d.press('Свободен');
-    await d.text('500 руб');
     expect(d.last()).toContain('Проверьте рейс');
     expect(d.last()).toContain('вт, 10 ноября в 17:00');
     await d.press('Выложить');
     expect(d.last()).toContain('Рейс выложен');
     const [trip] = await listDriverTrips(await dbId(201));
-    expect(trip).toMatchObject({ route: 'Буинск → Казань', seatsFree: 3, price: 500 });
+    expect(trip).toMatchObject({ route: 'Буинск → Казань', seatsFree: 3, price: 800 });
 
     // Пассажир: куда → когда → рейс → откуда и куда забрать → карточка → «Забронировать».
     await p.text('🚗 Найти поездку');
@@ -57,7 +56,7 @@ describe('главный сценарий: рейс → поиск → брон�
     expect(p.last()).toContain('Проверьте и бронируйте');
     expect(p.last()).toContain('Едет: Я сам');
     expect(p.last()).toContain('1 место · только сумка или рюкзак');
-    expect(p.last()).toContain('500 ₽');
+    expect(p.last()).toContain('800 ₽');
     await p.press('Забронировать');
     expect(p.last()).toContain('Заявка на бронь отправлена водителю');
     expect((await getTrip(trip!.id))!.seatsFree).toBe(2); // место удержано сразу
@@ -125,7 +124,7 @@ describe('главный сценарий: рейс → поиск → брон�
     // Правка прямо в карточке: места, багаж, комментарий.
     await p.press('💺');
     await p.press('2');
-    expect(p.last()).toContain('1 000 ₽');
+    expect(p.last()).toContain('1 600 ₽');
     await p.press('🧳');
     await p.press('Чемодан');
     await p.press('💬');
@@ -134,7 +133,7 @@ describe('главный сценарий: рейс → поиск → брон�
     expect(p.last()).toContain('чемодан или большая сумка');
     await p.press('💺');
     await p.press('1');
-    expect(p.last()).toContain('500 ₽');
+    expect(p.last()).toContain('800 ₽');
     expect(p.last()).toContain('ул. Ленина, 14');
     await p.press('Забронировать');
     expect(p.last()).toContain('Запомнить адрес');

@@ -341,6 +341,7 @@ adm-setting-saved = Сохранено. { $name }: { $value }
 adm-number-hint = Напишите целое число, например 30.
 adm-channel-of = Канал { $route }
 adm-travel-of = Время в пути { $route }, мин
+adm-price-of = Цена { $route }
 adm-channel-ask =
     Напишите адрес канала, например @baram_buinsk.
 
@@ -350,6 +351,12 @@ adm-channel-off = Отключить канал
 adm-channel-saved = Канал сохранён. Сводный пост появится после первого рейса.
 adm-channel-disabled = Публикация в канал отключена.
 adm-travel-ask = Сколько минут занимает дорога в одну сторону? Это защита от пересекающихся рейсов.
+adm-price-ask =
+    Цена места { $route } в рублях — одна в обе стороны и для всех водителей.
+
+    Доплаты за деревни и багаж сюда не входят. Новая цена действует для рейсов, выложенных после изменения.
+adm-price-hint = Напишите цену числом, от 100 до 10 000.
+adm-price-saved = Цена { $route }: { $price } за место.
 adm-villages = Деревни
 adm-villages-title = Деревни и сёла направления
 adm-villages-near = У города { $city }
@@ -391,8 +398,6 @@ setting-search_flex_hours = Гибкий поиск, ± часов
 setting-search_exact_minutes = Точное время, ± минут
 setting-trip_autoclose_hours = Закрыть рейс без «Доехали» через, часов
 setting-driver_late_cancel_hours = Поздняя отмена рейса водителем, часов
-setting-price_min = Минимальная цена места, ₽
-setting-price_max = Максимальная цена места, ₽
 setting-rating_min_count = Показывать рейтинг всем с, оценок
 setting-rating_alert_below = Сообщать админу, если рейтинг ниже
 setting-dispatcher_phone = Телефон диспетчера
@@ -453,8 +458,6 @@ trip-ask-trunk = <b>Что с багажником?</b>
 trunk-btn-free = Свободен
 trunk-btn-half = Наполовину занят
 trunk-btn-full = Почти занят
-trip-ask-price = <b>Цена за одно место?</b> Напишите число в рублях.
-trip-price-hint = Напишите цену числом, от { $min } до { $max }.
 trip-summary =
     <b>Проверьте рейс</b>
 
@@ -464,7 +467,7 @@ trip-summary =
     { $villages }
     Свободных мест: { $seats }
     { $trunk }
-    Цена: { $price } за место
+    Цена: { $price } за место — одна для всех водителей
 btn-publish = ✅ Выложить
 trip-field-route = Направление
 trip-field-day = День
@@ -473,14 +476,12 @@ trip-field-pickup = Как забираю
 trip-field-villages = Деревни
 trip-field-seats = Места
 trip-field-trunk = Багажник
-trip-field-price = Цена
 trip-problem-not_approved = Выкладывать рейсы можно после одобрения анкеты.
 trip-problem-past = Это время уже прошло. Выберите время позже.
 trip-problem-horizon = Так далеко вперёд рейс выложить нельзя. Выберите день ближе.
 trip-problem-limit = В этот день у вас уже есть столько рейсов в эту сторону, сколько разрешено. Выберите другой день.
 trip-problem-duplicate = У вас уже есть рейс в эту сторону почти в это же время. Отмените его в «Мои рейсы» или выберите другое время.
 trip-problem-overlap = Этот рейс пересекается с другим вашим рейсом: между ними не хватает времени на дорогу. Выберите другое время.
-trip-problem-price = Цена вне допустимых границ. Исправьте цену.
 trip-problem-seats = Мест больше, чем указано в анкете машины. Исправьте число мест.
 trip-published = ✅ <b>Рейс выложен.</b> Пассажиры уже видят его в поиске.
 trip-published-requests = { $n ->
