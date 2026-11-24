@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api';
-import { Button, ErrorNote, Loading, OptionCard, PageHeader, Screen, StepHeader, SummaryRows, TripCard, type IconName } from '../components';
+import { Button, ErrorNote, Icon, Loading, OptionCard, PageHeader, Screen, StepHeader, Stepper, SummaryRows, TripCard, type IconName } from '../components';
 import { BAGGAGE, car, dateTime, dayLong, minutesLabel, money, parseTime, phone as fmtPhone, seats as seatsLabel } from '../format';
 import { errorText, useLoad, useNav } from '../nav';
 import { Rosette, TulipBand } from '../Ornaments';
@@ -15,7 +15,7 @@ type StepId =
   | 'seats' | 'child'
   | 'baggage' | 'baggageNote'
   | 'comment'
-  | 'results' | 'point' | 'summary' | 'requestSummary' | 'fix' | 'requestDone';
+  | 'results' | 'point' | 'summary' | 'requestSummary' | 'requestDone';
 
 /** Номер вопроса для шапки «Шаг N из 7». */
 const STEP_NO: Partial<Record<StepId, number>> = {
@@ -29,7 +29,7 @@ const STEP_NO: Partial<Record<StepId, number>> = {
 };
 const TOTAL = 7;
 
-/** Порядок вопросов. После каждого — следующий; в режиме «Исправить» — сразу к рейсам. */
+/** Порядок вопросов. После каждого — следующий; после правки с экрана проверки — обратно на него. */
 const ORDER: StepId[] = ['who', 'from', 'to', 'day', 'seats', 'baggage', 'comment', 'results'];
 
 interface Addr {
@@ -85,7 +85,7 @@ export interface RequestStart {
 
 /**
  * Три пути:
- * - рейс выбран на доске (trip): откуда → куда → итог, остальное — по умолчанию, меняется кнопкой «Исправить»;
+ * - рейс выбран на доске (trip): откуда → куда → итог, остальное — по умолчанию, дополняется на экране проверки (человек, багаж, ребёнок, комментарий);
  * - заявка с доски (request): время → откуда → куда → итог;
  * - «Повторить поездку» (repeat): прежняя анкета, спрашиваем только день и время.
  */
@@ -161,6 +161,8 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
     const prev = history[history.length - 1];
     if (!prev) return nav.back();
     setHistory((h) => h.slice(0, -1));
+    // Вернулись на экран проверки без ответа — правка отменена.
+    if (prev === 'summary' || prev === 'requestSummary') setFixing(false);
     setStep(prev);
   };
 
@@ -168,13 +170,13 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
   const finalStep = (): StepId =>
     mode === 'request' ? 'requestSummary' : trip && trip.pickupMode !== 'door' && trip.pickupPoints.length ? 'point' : 'summary';
 
-  /** Вопрос отвечен: к следующему, а после «Исправить» — сразу к списку рейсов (или к итогу в коротком пути). */
+  /** Вопрос отвечен: к следующему, а после правки с экрана проверки — обратно на него. */
   const done = (question: StepId) => {
+    if (fixing && (mode !== 'classic' || (draft.trip && ['who', 'baggage', 'comment', 'seats'].includes(question)))) {
+      setFixing(false);
+      return goto(mode === 'request' ? 'requestSummary' : 'summary');
+    }
     if (mode !== 'classic') {
-      if (fixing) {
-        setFixing(false);
-        return goto(finalStep());
-      }
       if (question === 'day') return goto('from'); // в заявке время выбрано
       if (question === 'from') return goto('to');
       return goto(finalStep());
@@ -360,6 +362,38 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
     );
   };
 
+  /** Правка с экрана проверки: открываем нужный вопрос, после ответа вернёмся сюда. */
+  const edit = (id: StepId) => () => {
+    setFixing(true);
+    goto(id);
+  };
+
+  /**
+   * Всё, что можно уточнить, прямо на экране проверки: сколько человек и кнопки «+ багаж», «+ ребёнок»,
+   * «+ комментарий», «+ другой пассажир». Заполненное подсвечено, любое нажатие открывает вопрос.
+   */
+  const details = () => {
+    const maxSeats = Math.min(6, draft.trip?.seatsFree ?? 6);
+    const chip = (id: StepId, on: boolean, label: string) => (
+      <button type="button" key={id} className="seg__item" aria-pressed={on} onClick={edit(id)}>
+        {!on && <Icon name="plus" size={16} stroke={2.6} />}
+        {label}
+      </button>
+    );
+    return (
+      <>
+        <Stepper label="Сколько человек едет" value={draft.seats ?? 1} min={1} max={maxSeats} onChange={(n) => { patch({ seats: n }); haptic(); }} />
+        <div className="label-caps muted">Добавить подробности</div>
+        <div className="seg seg--chips">
+          {chip('baggage', draft.baggage !== 'bag', draft.baggage && draft.baggage !== 'bag' ? BAGGAGE[draft.baggage].replace(/^./, (c) => c.toUpperCase()) : 'Багаж')}
+          {chip('child', draft.childSeat !== 'none', draft.childSeat === 'own' ? 'Кресло своё' : draft.childSeat === 'driver' ? 'Кресло водителя' : 'Ребёнок до 7 лет')}
+          {chip('comment', !!draft.comment, draft.comment ? 'Комментарий' : 'Комментарий водителю')}
+          {chip('who', draft.passenger !== null, draft.passenger ? draft.passenger.name : 'Другой пассажир')}
+        </div>
+      </>
+    );
+  };
+
   switch (step) {
     case 'who':
       return frame(
@@ -472,7 +506,9 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
         <div className="stack">
           <OptionCard icon="check" title="Нет" selected={draft.childSeat === 'none'} onClick={() => { patch({ childSeat: 'none' }); done('seats'); }} />
           <OptionCard icon="child" title="Да, кресло своё" sub="Возьму детское кресло с собой" selected={draft.childSeat === 'own'} onClick={() => { patch({ childSeat: 'own' }); done('seats'); }} />
-          <OptionCard icon="child" title="Да, нужно кресло водителя" sub="Сначала покажем водителей с креслом" selected={draft.childSeat === 'driver'} onClick={() => { patch({ childSeat: 'driver' }); done('seats'); }} />
+          {(!draft.trip || draft.trip.driver.childSeat) && (
+            <OptionCard icon="child" title="Да, нужно кресло водителя" sub="Сначала покажем водителей с креслом" selected={draft.childSeat === 'driver'} onClick={() => { patch({ childSeat: 'driver' }); done('seats'); }} />
+          )}
         </div>,
         'По правилам ребёнку до 7 лет нужно детское кресло.',
       );
@@ -575,21 +611,20 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
     case 'summary': {
       const trip = draft.trip!;
       const total = trip.price * (draft.seats ?? 1);
-      const rows: [string, ReactNode][] = [
+      const rows: ([string, ReactNode] | [string, ReactNode, () => void])[] = [
         ['Едет', draft.passenger ? `${draft.passenger.name}, ${fmtPhone(draft.passenger.phone) || draft.passenger.phone}` : `${nav.me.user!.name} (вы)`],
-        ['Откуда', `${draft.from!.city}, ${draft.from!.address}`],
-        ['Куда', `${draft.to!.city}, ${draft.to!.address}`],
+        ['Откуда', `${draft.from!.city}, ${draft.from!.address}`, edit('from')],
+        ['Куда', `${draft.to!.city}, ${draft.to!.address}`, edit('to')],
         ['Когда', dateTime(trip.departsAt)],
-        ['Мест · багаж', `${draft.seats} · ${BAGGAGE[draft.baggage!]}`],
         ['Водитель', `${trip.driver.name} · ${car(trip.driver)}`],
       ];
-      if (draft.pickupPoint) rows.push(['Точка сбора', draft.pickupPoint]);
-      if (draft.childSeat && draft.childSeat !== 'none') rows.push(['Ребёнок до 7 лет', draft.childSeat === 'own' ? 'кресло своё' : 'нужно кресло водителя']);
-      if (draft.comment) rows.push(['Комментарий', draft.comment]);
+      if (draft.pickupPoint) rows.push(['Точка сбора', draft.pickupPoint, () => goto('point')]);
+      if (draft.comment) rows.push(['Комментарий', draft.comment, edit('comment')]);
       return (
         <Screen>
           <PageHeader title="Проверьте поездку" big onBack={stepBack} />
           <SummaryRows rows={rows} />
+          {details()}
           <div className="green">
             <div className="green__pad">
               <div className="green__sub" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -608,7 +643,6 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
           <div className="spacer" />
           <div className="stack">
             <Button variant="confirm" icon="check" disabled={busy} onClick={() => void submit('booking')}>Всё верно</Button>
-            <Button variant="outline" size="card" onClick={() => goto('fix')}>Исправить</Button>
           </div>
         </Screen>
       );
@@ -616,44 +650,23 @@ export function SearchFlow({ repeat, trip, request }: { repeat?: boolean; trip?:
 
     case 'requestSummary': {
       const whenText = draft.timeKind === 'exact' ? `в ${minutesLabel(draft.exactMinutes ?? 0)}` : TIME_SHORT[draft.timeKind!];
-      const rows: [string, ReactNode][] = [
+      const rows: ([string, ReactNode] | [string, ReactNode, () => void])[] = [
         ['Едет', draft.passenger ? `${draft.passenger.name}, ${fmtPhone(draft.passenger.phone) || draft.passenger.phone}` : `${nav.me.user!.name} (вы)`],
-        ['Откуда', `${draft.from!.city}, ${draft.from!.address}`],
-        ['Куда', `${draft.to!.city}, ${draft.to!.address}`],
-        ['Когда', `${draft.dayLabel ?? ''}, ${whenText}`],
-        ['Мест · багаж', `${draft.seats} · ${BAGGAGE[draft.baggage!]}`],
+        ['Откуда', `${draft.from!.city}, ${draft.from!.address}`, edit('from')],
+        ['Куда', `${draft.to!.city}, ${draft.to!.address}`, edit('to')],
+        ['Когда', `${draft.dayLabel ?? ''}, ${whenText}`, edit('time')],
       ];
-      if (draft.childSeat && draft.childSeat !== 'none') rows.push(['Ребёнок до 7 лет', draft.childSeat === 'own' ? 'кресло своё' : 'нужно кресло водителя']);
-      if (draft.comment) rows.push(['Комментарий', draft.comment]);
+      if (draft.comment) rows.push(['Комментарий', draft.comment, edit('comment')]);
       return (
         <Screen>
           <PageHeader title="Заявка водителям" big onBack={stepBack} />
           <SummaryRows rows={rows} />
+          {details()}
           <p className="muted">Заявку увидят все водители направления. Как только кто-то выложит рейс или возьмёт её, мы напишем в чат.</p>
           {error && <ErrorNote>{errorText(error)}</ErrorNote>}
           <div className="spacer" />
           <div className="stack">
             <Button variant="confirm" icon="check" disabled={busy} onClick={() => void submit('request')}>Отправить заявку</Button>
-            <Button variant="outline" size="card" onClick={() => goto('fix')}>Исправить</Button>
-          </div>
-        </Screen>
-      );
-    }
-
-    case 'fix': {
-      // По рейсу с доски день не меняют; в заявке «Когда» — это время.
-      const when: [StepId, string, IconName][] = mode === 'trip' ? [] : [[mode === 'request' ? 'time' : 'day', 'Когда', 'calendar']];
-      const fields: [StepId, string, IconName][] = [
-        ['who', 'Кто едет', 'user'], ['from', 'Откуда', 'pin'], ['to', 'Куда', 'pin'], ...when,
-        ['seats', 'Сколько мест и ребёнок', 'users'], ['baggage', 'Багаж', 'suitcase'], ['comment', 'Комментарий', 'help'],
-      ];
-      return (
-        <Screen steps>
-          <PageHeader title="Что исправить?" big onBack={stepBack} />
-          <div className="stack">
-            {fields.map(([id, label, icon]) => (
-              <OptionCard key={id} icon={icon} title={label} onClick={() => { setFixing(true); goto(id); }} />
-            ))}
           </div>
         </Screen>
       );
