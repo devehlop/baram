@@ -2,6 +2,7 @@ import type { Context } from 'grammy';
 import type { Role } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { esc } from '../../lib/format.js';
+import { publicChannelLink } from '../../services/directions.js';
 import { parseStartLink, sourceOf } from '../../services/links.js';
 import { createUser, getUserByTg } from '../../services/users.js';
 import type { MyConversation } from '../context.js';
@@ -78,15 +79,22 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   });
 
   if (role === 'driver') {
-    await w.say(t('reg-done-driver', { name: esc(name) }), { remove_keyboard: true });
+    const channel = await w.ext(() => channelNote());
+    await w.say(t('reg-done-driver', { name: esc(name) }) + channel, { remove_keyboard: true });
     await runDriverForm(w, from.id);
     return;
   }
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
     if (!user) return;
-    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }));
+    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }) + (await channelNote()));
     const link = parseStartLink(startPayload);
     if (link?.kind === 'trip') await sendTripLanding(chatId, link.tripId, user.id);
   });
+}
+
+/** Строка про канал с рейсами; пустая, если у канала нет публичной ссылки. */
+async function channelNote(): Promise<string> {
+  const link = await publicChannelLink();
+  return link ? `\n\n${t('reg-channel', { link })}` : '';
 }
