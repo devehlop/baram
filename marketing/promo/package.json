@@ -1,0 +1,37 @@
+{
+  "name": "baram-promo",
+  "version": "1.0.0",
+  "description": "Барам: промо-ролик для сторис и карусель для соцсетей (Remotion)",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.546",
+    "@remotion/fonts": "4.0.546",
+    "@remotion/transitions": "4.0.546",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.546"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.546",
+    "@types/react": "19.3.0",
+    "@types/web": "0.0.166",
+    "eslint": "10.15.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "studio": "remotion studio",
+    "render:story": "remotion render PromoStory out/baram-stories.mp4 --crf=18",
+    "render:feed": "remotion render PromoFeed out/baram-feed.mp4 --crf=18",
+    "render:karusel": "for i in 1 2 3 4 5 6 7 8; do remotion still Card$i out/karusel/baram-$i.png; done",
+    "typecheck": "tsc --noEmit"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}
