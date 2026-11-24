@@ -181,6 +181,9 @@ button.green { border: 0; text-align: left; width: 100%; }
 .rows { background: var(--c-surface); border-radius: var(--r-card); padding: 4px var(--sp-4); display: flex; flex-direction: column; }
 .rows__row { display: flex; justify-content: space-between; gap: var(--sp-3); padding: 10px 0; border-bottom: 1px solid var(--c-line); }
 .rows__row:last-child { border-bottom: 0; }
+.rows__row--tap { width: 100%; align-items: center; background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; color: inherit; }
+.rows__row--tap .rows__value { flex: 1; }
+.rows__row--tap svg { color: var(--c-ink-muted); }
 .rows__label { font-size: var(--fs-small); color: var(--c-ink-muted); flex-shrink: 0; }
 .rows__value { font-size: var(--fs-body); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .total { display: flex; justify-content: space-between; align-items: baseline; }
@@ -218,6 +221,14 @@ textarea.input { height: 88px; padding: 10px 14px; resize: none; line-height: 1.
   min-height: var(--h-button-small); padding: 0 14px; border-radius: var(--r-icon);
   border: 1.5px solid var(--c-line); background: var(--c-surface); font-size: var(--fs-small); font-weight: 600;
 }
+.seg--chips .seg__item { display: inline-flex; align-items: center; gap: 6px; }
+.stepper { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); background: var(--c-surface); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-4); }
+.stepper__title { font-size: var(--fs-card); font-weight: 600; line-height: 1.2; }
+.stepper__ctl { display: flex; align-items: center; gap: var(--sp-3); }
+.stepper__btn { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--c-line); background: var(--c-surface); font-size: 26px; font-weight: 600; line-height: 1; color: var(--c-ink); }
+.stepper__btn:not(:disabled) { border-color: var(--c-red); color: var(--c-red-ink); }
+.stepper__btn:disabled { opacity: .4; }
+.stepper__n { min-width: 28px; text-align: center; font-size: 24px; font-weight: 700; }
 .seg__item[aria-pressed='true'] { border-color: var(--c-red); background: var(--c-red); color: #FFFFFF; }
 
 /* ——— Главная и приветствие ——— */
