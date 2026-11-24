@@ -150,15 +150,38 @@ export function Chip({ children, kind }: { children: ReactNode; kind?: 'gold' | 
   return <span className={`chip${kind ? ` chip--${kind}` : ''}`}>{children}</span>;
 }
 
-export function SummaryRows({ rows }: { rows: [string, ReactNode][] }) {
+/** Строки «подпись — значение». Третий элемент делает строку кнопкой: нажал — изменил. */
+export function SummaryRows({ rows }: { rows: ([string, ReactNode] | [string, ReactNode, () => void])[] }) {
   return (
     <div className="rows">
-      {rows.map(([label, value]) => (
-        <div className="rows__row" key={label}>
-          <span className="rows__label">{label}</span>
-          <span className="rows__value">{value}</span>
-        </div>
-      ))}
+      {rows.map(([label, value, onEdit]) =>
+        onEdit ? (
+          <button type="button" className="rows__row rows__row--tap" key={label} onClick={onEdit}>
+            <span className="rows__label">{label}</span>
+            <span className="rows__value">{value}</span>
+            <Icon name="chevron" size={18} />
+          </button>
+        ) : (
+          <div className="rows__row" key={label}>
+            <span className="rows__label">{label}</span>
+            <span className="rows__value">{value}</span>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/** «Сколько человек»: − 1 +, меняется прямо на экране проверки. */
+export function Stepper(props: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  return (
+    <div className="stepper">
+      <span className="stepper__title">{props.label}</span>
+      <div className="stepper__ctl">
+        <button type="button" className="stepper__btn" aria-label="Меньше" disabled={props.value <= props.min} onClick={() => props.onChange(props.value - 1)}>−</button>
+        <span className="stepper__n" aria-live="polite">{props.value}</span>
+        <button type="button" className="stepper__btn" aria-label="Больше" disabled={props.value >= props.max} onClick={() => props.onChange(props.value + 1)}>+</button>
+      </div>
     </div>
   );
 }
