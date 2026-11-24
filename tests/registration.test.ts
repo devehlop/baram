@@ -104,4 +104,39 @@ describe('регистрация', () => {
     await d.press('Назад');
     expect(d.last()).toContain('как в водительских правах');
   });
+
+  it('водитель после отправки открывает анкету готовой и меняет одно поле', async () => {
+    const d = h.user(204);
+    const admin = h.user(ADMIN_ID);
+    await d.text('/start');
+    await d.press('Согласен');
+    await d.press('Я водитель');
+    await d.text('Ильдар');
+    await d.contact('+79170001155');
+    await d.text('Галиев Ильдар Ринатович');
+    await d.press('Lada Largus');
+    await d.text('2019');
+    await d.press('Белый');
+    await d.text('а123вс 116');
+    await d.press('4');
+    await d.press('Да');
+    await d.photo('p1');
+    await d.photo('p2');
+    await d.press('Готово');
+    await d.press('Тот же');
+    await d.press('Сбербанк');
+    await d.press('Отправить на проверку');
+
+    await d.text('👤 Мои данные');
+    await d.press('Изменить анкету');
+    expect(d.last()).toContain('Проверьте анкету');
+    expect(d.last()).toContain('А123ВС116');
+    await d.press('Исправить');
+    await d.press('Места');
+    await d.press('2');
+    await d.press('Отправить на проверку');
+    const driver = await getDriver((await getUserByTg(204))!.id);
+    expect(driver).toMatchObject({ status: 'pending', seats: 2, carPhotos: ['p1', 'p2'], plate: 'А123ВС116' });
+    expect(admin.all()).toContain('Новая анкета водителя');
+  });
 });
