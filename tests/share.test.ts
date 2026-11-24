@@ -40,7 +40,6 @@ describe('кнопка «Поделиться в чате»', () => {
     await d.press('Нет');
     await d.press('3');
     await d.press('Свободен');
-    await d.text('500 руб');
     await d.press('Выложить');
     expect(d.last()).toContain('Рейс выложен');
     await d.press('Поделиться рейсом');
@@ -56,7 +55,7 @@ describe('кнопка «Поделиться в чате»', () => {
     expect(a.text).toContain('Еду Буинск → Казань');
     expect(a.text).toContain('Сегодня, 10 ноября · 17:00');
     expect(a.text).toContain('Забираю от дома');
-    expect(a.text).toContain('Свободно: 3 места · 500 ₽ с человека');
+    expect(a.text).toContain('Свободно: 3 места · 800 ₽ с человека');
     expect(a.text).toContain('+7 917 000-00-01');
     expect(a.text).toContain('Забронировать место');
 

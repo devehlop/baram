@@ -114,7 +114,7 @@ const tripBody = z.object({
   villagesNote: z.string().trim().max(120).nullish(),
   seats: z.number().int().min(1).max(6),
   trunk: z.enum(['free', 'half', 'full']),
-  price: z.number().int().positive(),
+  // Цену водитель не задаёт: она берётся из направления. Поле от старых версий Mini App игнорируется.
 });
 
 /** Направление и сторона по паре «откуда — куда». null, если такой поездки нет. */
@@ -327,10 +327,8 @@ export function createApi(opts: ApiOptions): Hono<Env> {
       pending,
       openRequests: d.status === 'approved' ? (await listOpenRequestsForDriver(user.id)).length : 0,
       last: (await lastTrip(user.id)) ?? null,
-      routes: dirs.flatMap((x) => (['a', 'b'] as const).map((side) => ({ directionId: x.id, fromSide: side, label: routeLabel(x, side) }))),
+      routes: dirs.flatMap((x) => (['a', 'b'] as const).map((side) => ({ directionId: x.id, fromSide: side, label: routeLabel(x, side), price: x.price }))),
       days: dayOptions(s.trip_horizon_days),
-      priceMin: s.price_min,
-      priceMax: s.price_max,
     });
   });
 
@@ -353,7 +351,6 @@ export function createApi(opts: ApiOptions): Hono<Env> {
       villagesNote: b.villages ? (b.villagesNote ?? null) : null,
       seats: b.seats,
       trunk: b.trunk,
-      price: b.price,
     });
     if ('problem' in res) return c.json({ error: res.problem }, 409);
     return c.json({ trip: res.trip, waitingRequests: res.waitingRequests });

@@ -154,10 +154,9 @@ export interface DriverHome {
   pending: { booking: Booking; trip: Trip }[];
   openRequests: number;
   last: Trip | null;
-  routes: { directionId: number; fromSide: Side; label: string }[];
+  /** price — цена места на направлении, одна для всех водителей. */
+  routes: { directionId: number; fromSide: Side; label: string; price: number }[];
   days: DayOption[];
-  priceMin: number;
-  priceMax: number;
 }
 
 /** Маршрут доски: направление в одну сторону. */

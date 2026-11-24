@@ -67,6 +67,38 @@ describe('гибкий поиск', () => {
     expect(p.last()).toContain('пт, 13 ноября в 18:00');
   });
 
+  it('цена: одна на направление в обе стороны, её ставит админ, водитель не вводит', async () => {
+    const admin = h.user(ADMIN_ID);
+    const d = await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+
+    await admin.text('/admin');
+    await admin.press('Настройки');
+    expect(admin.buttons()).toContain('Цена Буинск ⇄ Казань: 800 ₽');
+    expect(admin.buttons().join('\n')).not.toContain('Минимальная цена');
+    await admin.press('Цена Буинск ⇄ Казань: 800 ₽');
+    await admin.text('50');
+    expect(admin.last()).toContain('от 100 до 10 000');
+    await admin.text('900 ₽');
+    expect(admin.last()).toContain('Цена Буинск ⇄ Казань: 900 ₽ за место');
+
+    // В сценарии водителя шага «Цена» нет: после багажника — сразу проверка, цена из направления.
+    await d.text('➕ Выложить рейс');
+    await d.press('Казань → Буинск');
+    await d.press('Сегодня');
+    await d.press('17:00');
+    await d.press('От дома до дома');
+    await d.press('Нет');
+    await d.press('3');
+    await d.press('Свободен');
+    expect(d.last()).toContain('Проверьте рейс');
+    expect(d.last()).toContain('900 ₽ за место — одна для всех водителей');
+    expect(d.buttons()).not.toContain('Цена');
+    await d.press('Выложить');
+    const back = await postTrip(201, { time: '09:00', dayOffset: 1 });
+    expect(back.price).toBe(900);
+    expect((await getTrip(back.id))!.price).toBe(900);
+  });
+
   it('деревня: предупреждение о доплате и пометка у рейсов, которые в деревни не заезжают', async () => {
     const admin = h.user(ADMIN_ID);
     await approvedDriver(h, 201, 'Ильдар', '+79170000001');
