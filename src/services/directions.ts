@@ -36,6 +36,18 @@ export function routeLabel(d: Pick<DirectionRow, 'cityA' | 'cityB'>, fromSide: S
   return `${cityOf(d, fromSide)} → ${cityOf(d, otherSide(fromSide))}`;
 }
 
+/**
+ * Ссылка на канал рейсов для показа людям. Есть только у канала, заданного как @название:
+ * у числового ID (-100…) публичной ссылки нет.
+ */
+export async function publicChannelLink(): Promise<string | undefined> {
+  for (const d of await listDirections()) {
+    const m = d.channelId?.trim().match(/^@([A-Za-z][A-Za-z0-9_]{3,})$/);
+    if (m) return `https://t.me/${m[1]}`;
+  }
+  return undefined;
+}
+
 /** Все активные города и деревни активных направлений. */
 export async function listLocalities(): Promise<LocalityView[]> {
   const rows = await app.db
