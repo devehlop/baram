@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '../api';
 import { Avatar, Button, CarPhotos, ErrorNote, Loading, PageHeader, Screen, StatusTimeline, SummaryRows } from '../components';
-import { BAGGAGE, car, dateTime, money, phone, seats, STATUS } from '../format';
+import { BAGGAGE, car, dateTime, money, phone, rating, seats, STATUS } from '../format';
 import { errorText, useLoad, useNav } from '../nav';
 import { ChuvashBand } from '../Ornaments';
 import { haptic } from '../tg';
@@ -67,6 +67,7 @@ export function Booking({ id }: { id: number }) {
           <div>
             <div className="person__name" style={{ fontSize: 18 }}>{d.name}{d.badge ? ' · проверен' : ''}</div>
             <div className="person__sub">{car(d)}</div>
+            {d.rating && <div className="person__sub">{rating(d.rating)}</div>}
           </div>
         </div>
         <CarPhotos tripId={trip.id} count={d.photoCount ?? 0} label={car(d)} />

@@ -58,3 +58,8 @@ export function splitList(raw: string, max: number): string[] {
     .filter((s) => s.length > 0)
     .slice(0, max);
 }
+
+/** 4.8333 → «4,8». */
+export function fmtStars(avg: number): string {
+  return (Math.round(avg * 10) / 10).toFixed(1).replace('.', ',');
+}

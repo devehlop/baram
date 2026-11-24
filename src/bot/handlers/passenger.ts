@@ -5,13 +5,14 @@ import { dayKey, fmtDayShort, fmtTime, now } from '../../lib/time.js';
 import { CANCELLABLE, getBooking, listUserBookings } from '../../services/bookings.js';
 import { closeRequest, getRequest, listUserOpenRequests } from '../../services/requests.js';
 import { deleteAddress, deletePassenger, listAddresses, listPassengers, saveAddress } from '../../services/saved.js';
+import { getRating } from '../../services/ratings.js';
 import { loadSettings } from '../../services/settings.js';
 import { getTrip } from '../../services/trips.js';
-import { cancelByPassenger, confirmRideAction, submitBooking } from '../actions.js';
+import { cancelByPassenger, confirmRideAction, rateAction, submitBooking } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
 import { kb, type Btn } from '../tg.js';
-import { bookingForPassenger, requestCard, timeLabel } from '../ui/cards.js';
+import { bookingForPassenger, requestCard, starsRow, starsText, timeLabel } from '../ui/cards.js';
 import { num, show, toast } from './shared.js';
 
 export const passenger = new Composer<MyContext>();
@@ -50,11 +51,14 @@ async function bookingScreen(ctx: MyContext, id: number, notice?: string): Promi
   if (!b || b.booker?.id !== ctx.user!.id) return toast(ctx, t('not-found'), true);
   const trip = (await getTrip(b.tripId))!;
   const s = await loadSettings();
+  const canRate = b.status === 'completed' && b.source !== 'phone';
+  const rating = canRate ? await getRating(b.id, 'driver') : undefined;
   await show(
     ctx,
-    `${notice ? `${notice}\n\n` : ''}${bookingForPassenger(b, trip, s.big_baggage_prepay)}`,
+    `${notice ? `${notice}\n\n` : ''}${bookingForPassenger(b, trip, s.big_baggage_prepay)}${rating ? `\n${t('rate-yours', { stars: starsText(rating.stars) })}` : ''}`,
     kb([
       [CANCELLABLE.includes(b.status) && { text: t('btn-cancel-booking'), data: `p:x:${b.id}`, style: 'danger' }],
+      [canRate && !rating && { text: t('btn-rate-driver'), data: `p:rt:${b.id}` }],
       [{ text: t('btn-repeat'), data: `p:rep:${b.id}` }, { text: t('btn-reverse'), data: `p:rev:${b.id}` }],
       [{ text: t('btn-complain'), data: `p:cmp:${b.id}` }],
       [{ text: t('btn-to-my-trips-passenger'), data: 'p:trips' }],
@@ -99,6 +103,36 @@ passenger.callbackQuery(/^p:bt:(\d+)$/, async (ctx) => {
 passenger.callbackQuery(/^p:(rep|rev):(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await enter(ctx, 'search', { bookingId: num(ctx, 2), reverse: ctx.match[1] === 'rev' });
+});
+
+// Оценка водителя: пять звёзд, как в Яндексе. 1–3 ★ — спрашиваем, что было не так, и сообщаем админу.
+passenger.callbackQuery(/^p:rt:(\d+)$/, async (ctx) => {
+  const b = await getBooking(num(ctx));
+  const trip = b && (await getTrip(b.tripId));
+  if (!b || !trip || b.booker?.id !== ctx.user!.id) return toast(ctx, t('not-found'), true);
+  await show(
+    ctx,
+    t('rate-ask-driver', { name: esc(trip.driver.name) }),
+    kb([starsRow(`p:rt:${b.id}`), [{ text: t('btn-back'), data: `p:b:${b.id}` }]]),
+  );
+});
+passenger.callbackQuery(/^p:rt:(\d+):([1-5])$/, async (ctx) => {
+  const id = num(ctx);
+  const stars = num(ctx, 2);
+  const res = await rateAction({ bookingId: id, target: 'driver', fromUserId: ctx.user!.id, stars });
+  if (!res.ok) return toast(ctx, t(res.reason === 'already' ? 'rate-already' : 'not-found'), true);
+  if (stars <= 3) {
+    await ctx.answerCallbackQuery();
+    return enter(ctx, 'prompt', { kind: 'rateComment', id, stars });
+  }
+  await show(
+    ctx,
+    t('rate-thanks', { stars: starsText(stars) }),
+    kb([
+      [{ text: t('btn-repeat'), data: `p:rep:${id}` }, { text: t('btn-reverse'), data: `p:rev:${id}` }],
+      [{ text: t('btn-to-my-trips-passenger'), data: 'p:trips' }],
+    ]),
+  );
 });
 
 passenger.callbackQuery(/^p:cmp:(\d+)$/, async (ctx) => {

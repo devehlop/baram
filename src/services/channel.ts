@@ -3,7 +3,7 @@ import { GrammyError, InlineKeyboard } from 'grammy';
 import { app } from '../app.js';
 import { channelPosts } from '../db/schema.js';
 import { t } from '../i18n.js';
-import { esc, money } from '../lib/format.js';
+import { esc, fmtStars, money } from '../lib/format.js';
 import { fmtDayKey, fmtTime, now, todayKey } from '../lib/time.js';
 import { log } from '../logger.js';
 import { getDirection, routeLabel } from './directions.js';
@@ -20,7 +20,7 @@ function tripLine(trip: TripView): string {
   // Ссылка ведёт сразу на этот рейс в боте: «Еду с ним» без поиска.
   const link = trip.seatsFree > 0 ? tripChannelLink(trip.id) : null;
   return [
-    `<b>${fmtTime(trip.departsAt)}</b> · ${esc(trip.driver.name)} · ${esc(trip.driver.car)} · ${seats} · ${money(trip.price)}`,
+    `<b>${fmtTime(trip.departsAt)}</b> · ${esc(trip.driver.name)}${trip.driver.rating ? ` ★${fmtStars(trip.driver.rating.avg)}` : ''} · ${esc(trip.driver.car)} · ${seats} · ${money(trip.price)}`,
     extra.length ? ` · ${extra.join(' · ')}` : '',
     link ? ` · <a href="${link}">${t('channel-book-link')}</a>` : '',
   ].join('');

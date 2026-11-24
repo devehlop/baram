@@ -4,7 +4,7 @@
  * поэтому правила и тексты уведомлений живут в одном месте.
  */
 import { t } from '../i18n.js';
-import { esc, fmtPhone } from '../lib/format.js';
+import { esc, fmtPhone, fmtStars } from '../lib/format.js';
 import { dayKey, fmtDateTime, fmtTime } from '../lib/time.js';
 import {
   acceptBooking,
@@ -38,12 +38,13 @@ import {
   type NewRequest,
   type RequestView,
 } from '../services/requests.js';
+import { getRating, passengerMarks, rateBooking, ratingOf, type RateResult, type RatingSummary } from '../services/ratings.js';
 import { loadSettings } from '../services/settings.js';
 import { cancelTrip, completeTrip, createTrip, getTrip, setTripDeparted, type TripInput, type TripView } from '../services/trips.js';
-import { getUser, userStats } from '../services/users.js';
+import { getUser } from '../services/users.js';
 import { driverReviewKb } from './notify.js';
 import { kb, notifyAdmins, notifyUser, send, sendPhotos } from './tg.js';
-import { bookingForDriver, bookingForPassenger, carLine, complaintCard, driverCard, requestCard, tripCard } from './ui/cards.js';
+import { bookingForDriver, bookingForPassenger, carLine, complaintCard, driverCard, requestCard, starsRow, tripCard } from './ui/cards.js';
 import { showMenu } from './ui/menu.js';
 import { app } from '../app.js';
 
@@ -136,8 +137,9 @@ export async function completeTripAction(tripId: number, driverId: number | null
     if (b.source === 'phone') continue;
     await notifyUser(
       b.booker?.id,
-      b.isSelf ? t('ride-arrived-self') : t('ride-arrived-other', { name: who(b) }),
+      `${b.isSelf ? t('ride-arrived-self') : t('ride-arrived-other', { name: who(b) })}\n\n${t('rate-ask-driver', { name: esc(trip.driver.name) })}`,
       kb([
+        starsRow(`p:rt:${b.id}`),
         [{ text: t('btn-repeat'), data: `p:rep:${b.id}` }, { text: t('btn-reverse'), data: `p:rev:${b.id}` }],
         [{ text: t('btn-complain'), data: `p:cmp:${b.id}` }],
       ]),
@@ -149,10 +151,64 @@ export async function completeTripAction(tripId: number, driverId: number | null
   return true;
 }
 
+// ——— Оценки ———
+
+/**
+ * Оценка после поездки. Если рейтинг человека только что опустился ниже порога из настроек —
+ * сообщаем админу (один раз при пересечении, а не на каждую оценку).
+ */
+export async function rateAction(input: Parameters<typeof rateBooking>[0]): Promise<RateResult> {
+  const res = await rateBooking(input);
+  if (!res.ok) return res;
+  const s = await loadSettings();
+  const min = Math.max(1, s.rating_min_count);
+  const low = (r: RatingSummary) => r.count >= min && r.avg < s.rating_alert_below;
+  if (low(res.after) && !low(res.before)) {
+    const u = await getUser(res.toUserId);
+    if (u) {
+      await notifyAdmins(
+        t(input.target === 'driver' ? 'adm-rating-low-driver' : 'adm-rating-low-passenger', {
+          name: esc(u.name),
+          phone: fmtPhone(u.phone),
+          avg: fmtStars(res.after.avg),
+          n: res.after.count,
+          limit: fmtStars(s.rating_alert_below),
+        }),
+        kb([[{ text: t('btn-open'), data: `a:u:${u.id}` }]]),
+      );
+    }
+  }
+  return res;
+}
+
+/** Плохая оценка водителю (1–3 ★) — админу, вместе с комментарием пассажира, если он есть. */
+export async function reportBadRating(bookingId: number): Promise<void> {
+  const r = await getRating(bookingId, 'driver');
+  const b = await getBooking(bookingId);
+  const trip = b && (await getTrip(b.tripId));
+  if (!r || !b || !trip || r.stars > 3) return;
+  const total = await ratingOf(trip.driverId, 'driver');
+  await notifyAdmins(
+    t('adm-rating-bad', {
+      stars: r.stars,
+      driver: esc(trip.driver.name),
+      phone: fmtPhone(trip.driver.phone),
+      route: esc(trip.route),
+      when: fmtDateTime(trip.departsAt),
+      from: esc(b.booker?.name ?? ''),
+      fromPhone: fmtPhone(b.booker?.phone ?? ''),
+      comment: r.comment ? esc(r.comment) : t('adm-rating-no-comment'),
+      avg: fmtStars(total.avg),
+      n: total.count,
+    }),
+    kb([[{ text: t('btn-open'), data: `a:u:${trip.driverId}` }]]),
+  );
+}
+
 // ——— Брони ———
 
 async function tellDriverAboutBooking(b: BookingView, trip: TripView): Promise<void> {
-  const marks = b.booker ? await userStats(b.booker.id) : undefined;
+  const marks = b.booker ? await passengerMarks(b.booker.id) : undefined;
   await notifyUser(
     trip.driverId,
     `${t('drv-new-booking', { route: esc(trip.route), when: fmtDateTime(trip.departsAt) })}\n\n${bookingForDriver(b, marks)}`,
@@ -462,7 +518,7 @@ export async function showDriverForReview(adminTg: number, driverId: number): Pr
   const d = await getDriver(driverId);
   if (!d) return;
   await sendPhotos(adminTg, d.carPhotos);
-  await send(adminTg, driverCard(d, { admin: true }), d.status === 'pending' ? driverReviewKb(driverId) : undefined);
+  await send(adminTg, driverCard(d, { admin: true, rating: await ratingOf(d.userId, 'driver') }), d.status === 'pending' ? driverReviewKb(driverId) : undefined);
 }
 
 export function adminTgIds(): number[] {

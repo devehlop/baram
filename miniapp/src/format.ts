@@ -75,3 +75,9 @@ export function parseTime(input: string): number | null {
   const min = m ? Number(m[2]) : 0;
   return Number.isNaN(h) || h > 23 || min > 59 ? null : h * 60 + min;
 }
+
+/** «★ 4,8 · 12 оценок»; пусто, если оценок мало. */
+export function rating(r: Trip['driver']['rating']): string {
+  if (!r) return '';
+  return `★ ${(Math.round(r.avg * 10) / 10).toFixed(1).replace('.', ',')} · ${r.count} ${plural(r.count, 'оценка', 'оценки', 'оценок')}`;
+}

@@ -6,17 +6,20 @@ import { esc, fmtPhone, money, normalizePhone } from '../../lib/format.js';
 import { getBooking, setPhoneBookingData } from '../../services/bookings.js';
 import { resolveComplaint, setComplaintNote } from '../../services/complaints.js';
 import { addVillage, setChannel, setDirectionPrice, setTravelMinutes } from '../../services/directions.js';
-import { isNumericKey, isSettingKey, setSetting } from '../../services/settings.js';
+import { DECIMAL_SETTINGS, isNumericKey, isSettingKey, setSetting } from '../../services/settings.js';
 import { getTrip } from '../../services/trips.js';
+import { setRatingComment } from '../../services/ratings.js';
 import { findUsers, getUser, getUserByTg, setRestriction } from '../../services/users.js';
-import { fileComplaint, reviewDriver } from '../actions.js';
+import { fileComplaint, reportBadRating, reviewDriver } from '../actions.js';
 import type { MyConversation } from '../context.js';
 import { kb, send } from '../tg.js';
+import { starsText } from '../ui/cards.js';
 import { column, Wizard, type Opt } from '../wizard.js';
 
 /** Короткие сценарии из одного вопроса: жалоба, данные пассажира по телефону, ввод значений админом. */
 export type PromptArgs =
   | { kind: 'complaint'; id?: number }
+  | { kind: 'rateComment'; id: number; stars: number }
   | { kind: 'phoneData'; id: number }
   | { kind: 'adminReject'; id: number }
   | { kind: 'adminSuspend'; id: number }
@@ -63,6 +66,12 @@ function question(a: PromptArgs): Question {
   switch (a.kind) {
     case 'complaint':
       return { text: t('complaint-ask'), validate: between(5, 1000) };
+    case 'rateComment':
+      return {
+        text: t('rate-comment-ask', { stars: starsText(a.stars) }),
+        rows: [[{ text: t('btn-skip'), data: 'skip' }]],
+        validate: between(2, 1000),
+      };
     case 'phoneData':
       return {
         text: t('phone-data-ask'),
@@ -81,7 +90,10 @@ function question(a: PromptArgs): Question {
     case 'adminSetting':
       return {
         text: t('adm-setting-ask', { name: t(`setting-${a.key}`) }),
-        validate: (v) => (!isNumericKey(a.key) || nonNegativeInt(v) ? null : t('adm-number-hint')),
+        validate: (v) =>
+          !isNumericKey(a.key) || nonNegativeInt(v) || (DECIMAL_SETTINGS.has(a.key) && /^\d{1,2}[.,]\d{1,2}$/.test(v))
+            ? null
+            : t('adm-number-hint'),
       };
     case 'adminFind':
       return { text: t('adm-find-ask'), validate: between(2, 60) };
@@ -120,6 +132,8 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
     back: false,
   });
   if (a.kind === 'home' || a.kind === 'back') {
+    // Плохая оценка уже сохранена — админ узнает о ней и без комментария.
+    if (args.kind === 'rateComment') await w.ext(() => reportBadRating(args.id));
     await w.say(t('prompt-cancelled'));
     return;
   }
@@ -144,6 +158,15 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
           if (!me) return;
           await fileComplaint({ fromUserId: me.id, bookingId: args.id ?? null, text });
           await say(t('complaint-sent'));
+          return;
+        }
+        case 'rateComment': {
+          if (me && text) await setRatingComment(args.id, 'driver', me.id, text);
+          await reportBadRating(args.id);
+          await say(
+            t('rate-thanks-bad'),
+            kb([[{ text: t('btn-open-booking'), data: `p:b:${args.id}` }]]),
+          );
           return;
         }
         case 'phoneData': {
@@ -180,7 +203,7 @@ export async function prompt(conv: MyConversation, ctx: Context, args: PromptArg
         }
         case 'adminSetting': {
           if (!isSettingKey(args.key)) return;
-          await setSetting(args.key, text);
+          await setSetting(args.key, DECIMAL_SETTINGS.has(args.key) ? text.replace(',', '.') : text);
           await say(t('adm-setting-saved', { name: t(`setting-${args.key}`), value: esc(text) }), kb([[{ text: t('adm-settings'), data: 'a:set' }]]));
           return;
         }

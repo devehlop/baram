@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useImage } from './api';
 import { ChuvashBand, Rosette } from './Ornaments';
-import { arrival, car, money, seats, time, TRUNK } from './format';
+import { arrival, car, money, rating, seats, time, TRUNK } from './format';
 import type { Trip } from './types';
 
 // ——— Иконки: линейные, stroke 2, скруглённые концы (DESIGN.md §2.4) ———
@@ -262,6 +262,7 @@ export function TripCard(props: { trip: Trip; first: boolean; village: boolean; 
           <div>
             <div className="person__name">{d.name}</div>
             <div className="person__sub">{car(d)}</div>
+            {d.rating && <div className="person__sub">{rating(d.rating)}</div>}
           </div>
         </div>
         <CarPhotos tripId={trip.id} count={d.photoCount ?? 0} label={car(d)} />

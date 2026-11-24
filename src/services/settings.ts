@@ -22,7 +22,12 @@ export const NUMERIC_SETTINGS = {
   search_exact_minutes: 60, // «точное время»: ± минут
   trip_autoclose_hours: 8, // рейс без «Доехали» закрывается сам
   driver_late_cancel_hours: 3, // отмена рейса с бронями позже срока — сигнал админу
+  rating_min_count: 3, // со скольких оценок рейтинг показывается всем
+  rating_alert_below: 4, // рейтинг опустился ниже — сообщаем админу (можно дробное, например 4.5)
 } as const;
+
+/** Настройки, где допустима дробная часть: «4,5» → 4.5. */
+export const DECIMAL_SETTINGS: ReadonlySet<string> = new Set(['rating_alert_below']);
 
 export const TEXT_SETTINGS = {
   dispatcher_phone: '', // телефон диспетчера для кнопки «Помощь»
