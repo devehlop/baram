@@ -229,11 +229,17 @@ export async function runDriverForm(w: Wizard, telegramId: number): Promise<void
   const user = await w.ext(() => getUserByTg(telegramId));
   if (!user) return;
   const state: FormState = { ownPhone: user.phone };
-  const res = await runSteps(w, steps, state);
+  // Анкета уже есть (на проверке или отклонена): открываем её готовой, с кнопкой «Исправить».
+  const existing = await w.ext(() => getDriver(user.id));
+  if (existing) {
+    const { fullName, car, carYear, carColor, plate, seats, childSeat, carPhotos, payPhone, payBank } = existing;
+    Object.assign(state, { fullName, car, carYear, carColor, plate, seats, childSeat, carPhotos, payPhone, payBank });
+  }
+  const res = await runSteps(w, steps, state, existing ? 'summary' : undefined);
   if (res === 'home') {
     await w.ext(async () => {
       const u = await getUserByTg(telegramId);
-      if (u) await showMenu(u, t('drv-form-cancelled'));
+      if (u) await showMenu(u, existing ? undefined : t('drv-form-cancelled'));
     });
     return;
   }
