@@ -55,7 +55,7 @@ async function main(): Promise<void> {
       maxWebhook: maxReceiver && webhookUrl ? { secret: maxReceiver.secret, push: (u) => maxReceiver.push(u) } : undefined,
     });
   }
-  if (max && maxReceiver) void connectMax(max, maxReceiver, webhookUrl, commands);
+  if (max && maxReceiver) void connectMax(max, maxReceiver, webhookUrl);
   if (config.miniappUrl) {
     // Кнопка слева от поля ввода в чате с ботом открывает Mini App.
     await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: t('miniapp-button'), web_app: { url: config.miniappUrl } } });
@@ -89,15 +89,13 @@ async function connectMax(
   max: MaxClient,
   receiver: MaxReceiver,
   webhookUrl: string | undefined,
-  commands: { command: string; description: string }[],
 ): Promise<void> {
+  // Список команд в MAX через API не записывается (PATCH /me отвечает method.not.found).
+  // Команды при этом работают, если их написать.
   for (;;) {
     try {
       const me = await max.call<{ username?: string | null; user_id: string }>('GET', '/me');
       initApp({ ...app, maxBotUsername: me.username ?? undefined });
-      await max
-        .call('PATCH', '/me', {}, { commands: commands.map((c) => ({ name: c.command, description: c.description })) })
-        .catch((err) => log.warn({ err }, 'MAX: не удалось записать список команд'));
       log.info({ bot: me.username }, 'MAX: бот подключён');
       if (webhookUrl) await receiver.subscribe(webhookUrl);
       else void receiver.poll();
