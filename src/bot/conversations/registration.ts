@@ -7,7 +7,7 @@ import { parseStartLink, sourceOf } from '../../services/links.js';
 import { createUser, getUserByTg } from '../../services/users.js';
 import type { MyConversation } from '../context.js';
 import { sendTripLanding } from '../landing.js';
-import { appOn, onMax } from '../platform.js';
+import { appKey, appOn, onMax } from '../platform.js';
 import { showMenu } from '../ui/menu.js';
 import { column, Wizard } from '../wizard.js';
 import { runDriverForm } from './driverForm.js';
@@ -89,7 +89,7 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
     if (!user) return;
-    const appNote = appOn(chatId) ? `\n\n${t('reg-done-app')}` : '';
+    const appNote = appOn(chatId) ? `\n\n${t(appKey(chatId, 'reg-done-app'))}` : '';
     await showMenu(user, t(onMax(chatId) ? 'reg-done-passenger-max' : 'reg-done-passenger', { name: esc(userName) }) + appNote + (await channelNote()));
     const link = parseStartLink(startPayload);
     if (link?.kind === 'trip') await sendTripLanding(chatId, link.tripId, user.id);
@@ -98,7 +98,7 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
 
 /** Приветствие перед согласием. Про приложение говорим, только если человек может его открыть. */
 export function introText(chatId: number): string {
-  return [t('reg-intro'), appOn(chatId) ? t('reg-intro-ways') : '', t('reg-intro-start'), t('reg-consent')]
+  return [t('reg-intro'), appOn(chatId) ? t(appKey(chatId, 'reg-intro-ways')) : '', t('reg-intro-start'), t('reg-consent')]
     .filter(Boolean)
     .join('\n\n');
 }

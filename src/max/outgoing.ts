@@ -16,17 +16,44 @@ import { entryOf, noteContent, numOf } from './messages.js';
  *
  * Чего в MAX нет и как это заменено:
  * - Большие кнопки внизу экрана → инлайн-кнопки под сообщением; нажатие приходит боту текстом.
- * - Цвет кнопок → без цвета. Кнопки Mini App → пока не показываются.
+ * - Цвет кнопок → без цвета.
+ * - Кнопки Mini App → кнопки open_app (если приложение подключено в MAX), экран — параметром запуска.
  */
 
 type Payload = Record<string, any>;
 type TgResult = { ok: true; result: unknown } | { ok: false; error_code: number; description: string };
 
 interface MaxButton {
-  type: 'callback' | 'link' | 'request_contact';
+  type: 'callback' | 'link' | 'request_contact' | 'open_app';
   text: string;
   payload?: string;
   url?: string;
+  /** open_app: имя бота, чьё мини-приложение открыть. */
+  web_app?: string;
+}
+
+/**
+ * Параметр запуска Mini App из адреса кнопки Telegram: ?screen=board&route=1-a&day=2026-11-10 →
+ * board_1-a_2026-11-10 (так его разбирает startScreen в miniapp/src/tg.ts). В MAX у кнопки нет
+ * своего адреса — открывается приложение из настроек бота, а экран передаётся этим параметром.
+ */
+export function startParamOf(url: string): string | undefined {
+  try {
+    const q = new URL(url).searchParams;
+    const screen = q.get('screen');
+    if (!screen) return undefined;
+    const param = [screen, q.get('route') ?? '', q.get('day') ?? ''].join('_').replace(/_+$/, '');
+    return param.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 512) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Кнопка Mini App. В MAX — только когда приложение подключено там (MAX_MINIAPP), иначе кнопки нет. */
+function appButton(text: string, url: unknown): MaxButton | null {
+  if (!app.maxMiniapp || !app.maxBotUsername || typeof url !== 'string') return null;
+  const payload = startParamOf(url);
+  return { type: 'open_app', text, web_app: app.maxBotUsername, ...(payload ? { payload } : {}) };
 }
 
 const fail = (error_code: number, description: string): TgResult => ({ ok: false, error_code, description });
@@ -45,17 +72,23 @@ export function maxKeyboard(markup: any): { type: 'inline_keyboard'; payload: { 
     for (const b of row) {
       if (typeof b.callback_data === 'string') out.push({ type: 'callback', text: b.text, payload: b.callback_data });
       else if (typeof b.url === 'string') out.push({ type: 'link', text: b.text, url: b.url });
-      // web_app (Mini App) и прочее в MAX пока не показываем.
+      else if (b.web_app) {
+        const a = appButton(b.text, b.web_app.url);
+        if (a) out.push(a);
+      }
     }
     if (out.length) add(out);
   }
   for (const row of (markup.keyboard ?? []) as any[][]) {
-    const out: MaxButton[] = row.map((b) => {
+    const out: MaxButton[] = [];
+    for (const b of row) {
       const text = typeof b === 'string' ? b : String(b.text);
-      return typeof b === 'object' && b.request_contact
-        ? { type: 'request_contact' as const, text }
-        : { type: 'callback' as const, text, payload: TEXT_BUTTON + text };
-    });
+      if (typeof b === 'object' && b.web_app) {
+        const a = appButton(text, b.web_app.url);
+        if (a) out.push(a);
+      } else if (typeof b === 'object' && b.request_contact) out.push({ type: 'request_contact', text });
+      else out.push({ type: 'callback', text, payload: TEXT_BUTTON + text });
+    }
     if (out.length) add(out);
   }
   return rows.length ? { type: 'inline_keyboard', payload: { buttons: rows } } : null;
@@ -69,6 +102,19 @@ async function imageAttachment(ref: unknown): Promise<object | null> {
   return token ? { type: 'image', payload: { token } } : null;
 }
 
+/** Вложения без кнопок open_app; null — таких кнопок не было. */
+function withoutAppButtons(attachments: object[]): object[] | null {
+  let found = false;
+  const out = attachments.map((a: any) => {
+    if (a.type !== 'inline_keyboard') return a;
+    const buttons = (a.payload.buttons as MaxButton[][])
+      .map((row) => row.filter((b) => (b.type === 'open_app' ? ((found = true), false) : true)))
+      .filter((row) => row.length);
+    return { ...a, payload: { buttons } };
+  });
+  return found ? out.filter((a: any) => a.type !== 'inline_keyboard' || a.payload.buttons.length) : null;
+}
+
 /** Ответ Telegram на отправку: сообщение с нашим номером. */
 function sentMessage(chatId: number, num: number, text?: string) {
   return { message_id: num, date: Math.floor(Date.now() / 1000), chat: { id: chatId, type: 'private' }, text };
@@ -77,12 +123,19 @@ function sentMessage(chatId: number, num: number, text?: string) {
 async function post(chatId: number, body: { text?: string; format?: 'html'; attachments: object[] }, noPreview: boolean, sticky?: object) {
   const userId = await maxUserIdOf(chatId);
   if (!userId) return null;
-  const res = await app.max!.call<{ message?: { body?: { mid?: string } } }>(
-    'POST',
-    '/messages',
-    { user_id: userId, disable_link_preview: noPreview || undefined },
-    body,
-  );
+  const query = { user_id: userId, disable_link_preview: noPreview || undefined };
+  type Sent = { message?: { body?: { mid?: string } } };
+  let res: Sent;
+  try {
+    res = await app.max!.call<Sent>('POST', '/messages', query, body);
+  } catch (e) {
+    // Кнопку приложения MAX может не принять (например, адрес не вписан в настройках бота).
+    // Экран без неё лучше, чем никакого: отправляем ещё раз без кнопок приложения.
+    const stripped = withoutAppButtons(body.attachments);
+    if (!(e instanceof MaxError) || e.status !== 400 || !stripped) throw e;
+    log.warn({ err: e }, 'MAX: кнопку приложения не приняли, отправляем без неё');
+    res = await app.max!.call<Sent>('POST', '/messages', query, { ...body, attachments: stripped });
+  }
   const mid = res.message?.body?.mid;
   if (!mid) throw new MaxError(500, 'no.mid', 'в ответе нет id сообщения');
   const num = numOf(mid, false);

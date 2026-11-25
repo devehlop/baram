@@ -15,6 +15,7 @@ const schema = z.object({
   MAX_BOT_TOKEN: z.string().default(''),
   MAX_API_ROOT: z.string().default(''),
   MAX_WEBHOOK_URL: z.string().default(''),
+  MAX_MINIAPP: z.string().default(''),
 });
 
 export interface Config {
@@ -38,6 +39,8 @@ export interface Config {
     apiRoot?: string;
     /** Адрес вебхука (https://…/max/webhook). Пусто — long polling, только для разработки. */
     webhookUrl?: string;
+    /** Адрес Mini App вписан в настройках бота на business.max.ru: показывать кнопки приложения в MAX. */
+    miniapp: boolean;
   };
 }
 
@@ -66,7 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     miniappUrl: e.MINIAPP_URL.trim() || undefined,
     port: Number(e.PORT) || 8080,
     max: e.MAX_BOT_TOKEN.trim()
-      ? { token: e.MAX_BOT_TOKEN.trim(), apiRoot: e.MAX_API_ROOT.trim() || undefined, webhookUrl: e.MAX_WEBHOOK_URL.trim() || undefined }
+      ? { token: e.MAX_BOT_TOKEN.trim(), apiRoot: e.MAX_API_ROOT.trim() || undefined, webhookUrl: e.MAX_WEBHOOK_URL.trim() || undefined, miniapp: /^(1|on|true|yes)$/i.test(e.MAX_MINIAPP.trim()) }
       : undefined,
     miniappDevTelegramId: e.NODE_ENV !== 'production' && Number(e.MINIAPP_DEV_TG_ID) > 0 ? Number(e.MINIAPP_DEV_TG_ID) : undefined,
   };
