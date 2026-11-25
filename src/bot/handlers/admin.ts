@@ -2,7 +2,7 @@ import { Composer } from 'grammy';
 import type { PrivilegeKind, Side } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone, money } from '../../lib/format.js';
-import { fmtDateTime, now } from '../../lib/time.js';
+import { dayStart, fmtDateTime, now, todayKey } from '../../lib/time.js';
 import { listPendingAdminBookings } from '../../services/bookings.js';
 import { getComplaint, listOpenComplaints, takeComplaint } from '../../services/complaints.js';
 import { cityOf, deactivateVillage, getDirection, listDirections, listLocalities } from '../../services/directions.js';
@@ -10,6 +10,7 @@ import { getDriver, grantPrivilege, listDriversByStatus, revokePrivilege } from 
 import { lowRatings, ratingOf } from '../../services/ratings.js';
 import { candidateDrivers, getRequest, listEscalatedRequests } from '../../services/requests.js';
 import { loadSettings, SETTING_KEYS } from '../../services/settings.js';
+import { activity, funnel } from '../../services/stats.js';
 import { getTrip } from '../../services/trips.js';
 import { botLink, CHANNEL_SOURCE, DRIVER_SOURCE_PREFIX } from '../../services/links.js';
 import { getUser, setRestriction, sourceStats, userStats, type SourceStat } from '../../services/users.js';
@@ -45,12 +46,83 @@ export async function adminMenu(ctx: MyContext): Promise<void> {
       [{ text: t('adm-complaints-n', { n: complaints.length }), data: 'a:cmp' }],
       [{ text: t('adm-bookings-n', { n: bookings.length }), data: 'a:bk' }],
       [{ text: t('adm-users'), data: 'a:usr' }],
-      [{ text: t('adm-sources'), data: 'a:src' }],
+      [{ text: t('adm-stats'), data: 'a:st:7' }, { text: t('adm-sources'), data: 'a:src' }],
       [{ text: t('adm-villages'), data: 'a:vil' }, { text: t('adm-settings'), data: 'a:set' }],
     ]),
   );
 }
 guarded.callbackQuery('a:menu', adminMenu);
+
+// ——— Статистика ———
+
+/** Срок отчёта: сегодня (с полуночи), N дней или всё время. */
+type StatsPeriod = 'd' | '7' | '30' | 'all';
+
+function periodStart(p: StatsPeriod): Date | undefined {
+  if (p === 'all') return undefined;
+  if (p === 'd') return dayStart(todayKey());
+  return new Date(now().getTime() - Number(p) * 86_400_000);
+}
+
+function periodLabel(p: StatsPeriod): string {
+  if (p === 'all') return t('adm-stats-period-all');
+  if (p === 'd') return t('adm-stats-period-today');
+  return t('adm-stats-period-days', { days: Number(p) });
+}
+
+/** « · 67%» от числа нажавших «Старт»; пусто, если делить не на что. */
+const pct = (n: number, of: number): string => (of > 0 ? ` · ${Math.round((n / of) * 100)}%` : '');
+
+async function statsScreen(ctx: MyContext, p: StatsPeriod): Promise<void> {
+  const since = periodStart(p);
+  const [f, a] = await Promise.all([funnel(since), activity(since)]);
+  const text = [
+    `<b>${t('adm-stats-title', { period: periodLabel(p) })}</b>`,
+    t('adm-stats-funnel', {
+      started: f.started,
+      registered: f.registered,
+      registeredPct: pct(f.registered, f.started),
+      booked: f.booked,
+      bookedPct: pct(f.booked, f.started),
+      rode: f.rode,
+      rodePct: pct(f.rode, f.started),
+      drivers: f.drivers,
+      left: f.started - f.registered,
+    }),
+    t('adm-stats-trips', {
+      posted: a.tripsPosted,
+      completed: a.tripsCompleted,
+      cancelled: a.tripsCancelled,
+      bookings: a.bookings,
+      bookingsCompleted: a.bookingsCompleted,
+      bookingsCancelled: a.bookingsCancelled,
+      noShows: a.noShows,
+      seats: a.seatsCompleted,
+      revenue: money(a.revenue),
+      requests: a.requests,
+      requestsTaken: a.requestsTaken,
+    }),
+    t('adm-stats-people', {
+      active: a.active,
+      usersTotal: a.usersTotal,
+      driversApproved: a.driversApproved,
+      driversPending: a.driversPending,
+      driverForms: a.driverForms,
+    }),
+    `<i>${t('adm-stats-note')}</i>`,
+  ].join('\n\n');
+  const tab = (key: StatsPeriod, label: string): Btn => ({ text: key === p ? `· ${label} ·` : label, data: `a:st:${key}` });
+  await show(
+    ctx,
+    text,
+    kb([
+      [tab('d', t('adm-stats-today')), tab('7', t('adm-stats-7')), tab('30', t('adm-stats-30')), tab('all', t('adm-stats-all'))],
+      [{ text: t('adm-sources'), data: 'a:src' }],
+      menuBack(),
+    ]),
+  );
+}
+guarded.callbackQuery(/^a:st:(d|7|30|all)$/, (ctx) => statsScreen(ctx, ctx.match[1] as StatsPeriod));
 
 // ——— Откуда приходят ———
 
