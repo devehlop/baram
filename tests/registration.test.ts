@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { app } from '../src/app.js';
 import { getDriver } from '../src/services/drivers.js';
 import { getUserByTg } from '../src/services/users.js';
 import { ADMIN_ID, setup, type Harness } from './helpers.js';
@@ -35,6 +36,32 @@ describe('регистрация', () => {
     const user = await getUserByTg(101);
     expect(user).toMatchObject({ name: 'Айгуль', phone: '+79171234567', activeRole: 'passenger' });
     expect(u.menu()).toEqual(['🚗 Найти поездку', '📋 Доска', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
+  });
+
+  it('первое сообщение объясняет сервис, а про приложение говорит, только когда оно включено', async () => {
+    const u = h.user(102);
+    await u.text('/start');
+    expect(u.last()).toContain('попутчики Буинск ⇄ Казань');
+    expect(u.last()).toContain('регистрация здесь, в чате');
+    expect(u.last()).not.toContain('В приложении «Барам»');
+
+    app.miniappUrl = 'https://baram.example.ru/app';
+    try {
+      const v = h.user(103);
+      await v.text('/start');
+      expect(v.last()).toContain('Прямо в этом чате');
+      expect(v.last()).toContain('В приложении «Барам»');
+      await v.press('Согласен');
+      await v.press('Я пассажир');
+      await v.text('Айгуль');
+      await v.contact('89171234568');
+      expect(v.last()).toContain('Вот что где');
+      expect(v.last()).toContain('есть в приложении');
+      await v.text('☎️ Помощь');
+      expect(v.last()).toContain('есть в приложении «Барам»');
+    } finally {
+      app.miniappUrl = undefined;
+    }
   });
 
   it('без согласия дальше не пускает; политика доступна командой /privacy', async () => {

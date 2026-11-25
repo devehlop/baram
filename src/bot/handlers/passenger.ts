@@ -1,4 +1,5 @@
 import { Composer } from 'grammy';
+import { app } from '../../app.js';
 import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone } from '../../lib/format.js';
 import { dayKey, fmtDayShort, fmtTime, now } from '../../lib/time.js';
@@ -244,7 +245,13 @@ export async function help(ctx: MyContext): Promise<void> {
   const phone = s.dispatcher_phone.trim();
   await show(
     ctx,
-    [t('help-text', { hours: s.late_cancel_hours }), phone ? t('help-dispatcher', { phone: esc(phone) }) : ''].filter(Boolean).join('\n\n'),
+    [
+      t('help-text', { hours: s.late_cancel_hours }),
+      app.miniappUrl ? t('help-app') : '',
+      phone ? t('help-dispatcher', { phone: esc(phone) }) : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     kb([
       [{ text: t('btn-complain'), data: 'p:cmp:0' }],
       [{ text: t('btn-saved'), data: 'p:saved' }],

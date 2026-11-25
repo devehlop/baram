@@ -1,4 +1,5 @@
 import type { Context } from 'grammy';
+import { app } from '../../app.js';
 import type { Role } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { esc } from '../../lib/format.js';
@@ -30,9 +31,10 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   const from = ctx.from!;
   const w = new Wizard(conv, chatId, ctx.callbackQuery?.message?.message_id);
 
-  // Согласие на обработку персональных данных — до того, как спрашиваем имя и телефон.
+  // Первое сообщение: что это за сервис, где им пользоваться (чат или Mini App) и согласие на обработку данных —
+  // до того, как спрашиваем имя и телефон.
   const consent = await w.ask({
-    text: t('reg-consent'),
+    text: introText(),
     rows: column([{ text: t('reg-consent-yes'), data: 'yes' }]),
     back: false,
     home: false,
@@ -87,10 +89,18 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
     if (!user) return;
-    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }) + (await channelNote()));
+    const appNote = app.miniappUrl ? `\n\n${t('reg-done-app')}` : '';
+    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }) + appNote + (await channelNote()));
     const link = parseStartLink(startPayload);
     if (link?.kind === 'trip') await sendTripLanding(chatId, link.tripId, user.id);
   });
+}
+
+/** Приветствие перед согласием. Про приложение говорим, только если Mini App включена (MINIAPP_URL). */
+export function introText(): string {
+  return [t('reg-intro'), app.miniappUrl ? t('reg-intro-ways') : '', t('reg-intro-start'), t('reg-consent')]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /** Строка про канал с рейсами; пустая, если у канала нет публичной ссылки. */
