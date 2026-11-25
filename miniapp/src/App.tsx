@@ -7,7 +7,7 @@ import { DriverHomeScreen, DriverTripScreen, DriverTripsScreen, PostTripScreen }
 import { Help, Home, MyTrips, Onboarding } from './screens/Passenger';
 import { Board } from './screens/Board';
 import { SearchFlow } from './screens/SearchFlow';
-import { startScreen, tg } from './tg';
+import { backButton, setBotUsername, startScreen } from './tg';
 import type { Me } from './types';
 
 export function App() {
@@ -21,7 +21,9 @@ export function App() {
 
   const reloadMe = useCallback(async () => {
     try {
-      setMe(await api<Me>('/me'));
+      const fresh = await api<Me>('/me');
+      setBotUsername(fresh.botUsername);
+      setMe(fresh);
       setError(null);
     } catch (e) {
       setError(e instanceof ApiError ? e.code : 'network');
@@ -34,10 +36,10 @@ export function App() {
 
   const back = useCallback(() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)), []);
 
-  // Системная кнопка «Назад» Telegram — в дополнение к нашей (DESIGN.md §8).
+  // Системная кнопка «Назад» Telegram или MAX — в дополнение к нашей (DESIGN.md §8).
   const canGoBack = stack.length > 1;
   useEffect(() => {
-    const btn = tg?.BackButton;
+    const btn = backButton();
     if (!btn) return;
     try {
       if (canGoBack) btn.show();
