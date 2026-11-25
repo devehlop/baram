@@ -4,6 +4,7 @@ import { acceptBookingAction, completeTripAction, submitBooking } from '../src/b
 import { visitors } from '../src/db/schema.js';
 import { declineBooking } from '../src/services/bookings.js';
 import { activity, funnel } from '../src/services/stats.js';
+import { getUserByTg } from '../src/services/users.js';
 import { ADMIN_ID, approvedDriver, dbId, passenger, postTrip, setClock, setup, type Harness } from './helpers.js';
 
 // Вторник, 10 ноября 2026, 09:00 по Москве.
@@ -44,7 +45,7 @@ describe('кто нажал «Старт»', () => {
   it('первое сообщение записывается до регистрации, метка источника — с первого раза и навсегда', async () => {
     const u = h.user(101);
     await u.text('/start s_Aigul');
-    expect(u.last()).not.toContain('Найти поездку'); // ещё не зарегистрирован
+    expect(await getUserByTg(101)).toBeUndefined(); // ещё не зарегистрирован, а «Старт» уже записан
     const first = await visitor(101);
     expect(first).toMatchObject({ source: 'aigul', firstSeenAt: new Date(NOW), lastSeenAt: new Date(NOW) });
 
