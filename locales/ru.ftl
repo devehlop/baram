@@ -413,7 +413,7 @@ adm-stats-note = Проценты — от нажавших «Старт». Но
 adm-sources = 📈 Откуда приходят
 adm-sources-title = Откуда пришли люди за { $days } дней
 adm-sources-title-all = Откуда пришли люди за всё время
-adm-sources-empty = Пока никто не зарегистрировался.
+adm-sources-empty = Пока никто не приходил.
 adm-sources-30 = За 30 дней
 adm-sources-all = За всё время
 adm-sources-howto =
@@ -423,7 +423,7 @@ adm-sources-howto =
 src-none = Без метки
 src-channel = Канал направления
 src-driver = Рейс водителя { $name }
-src-line = • { $label }: людей { $users } · бронировали { $bookers } · броней { $bookings } · доехали { $completed }
+src-line = • { $label }: нажали «Старт» { $starts } · зарегистрировались { $users } · бронировали { $bookers } · броней { $bookings } · доехали { $completed }
 adm-late-trip-cancel =
     ⚠️ <b>Водитель отменил рейс с бронями в последний момент</b>
     { $driver }, { $phone }

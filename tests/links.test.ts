@@ -179,9 +179,9 @@ describe('канал и админ', () => {
     await admin.press('Откуда приходят');
     const text = admin.last();
     expect(text).toContain('за 30 дней');
-    expect(text).toContain('aigul: людей 2 · бронировали 0 · броней 0 · доехали 0');
-    expect(text).toContain('Рейс водителя Ильдар: людей 1 · бронировали 1 · броней 1 · доехали 0');
-    expect(text).toContain('Без метки: людей 1'); // сам водитель
+    expect(text).toContain('aigul: нажали «Старт» 2 · зарегистрировались 2 · бронировали 0 · броней 0 · доехали 0');
+    expect(text).toContain('Рейс водителя Ильдар: нажали «Старт» 1 · зарегистрировались 1 · бронировали 1 · броней 1 · доехали 0');
+    expect(text).toContain('Без метки: нажали «Старт» 0 · зарегистрировались 1'); // сам водитель, заведён в базе минуя бота
     expect(text).toContain('https://t.me/baram_test_bot?start=s_aigul');
     await admin.press('За всё время');
     expect(admin.last()).toContain('за всё время');

@@ -10,7 +10,7 @@ import { getDriver, grantPrivilege, listDriversByStatus, revokePrivilege } from 
 import { lowRatings, ratingOf } from '../../services/ratings.js';
 import { candidateDrivers, getRequest, listEscalatedRequests } from '../../services/requests.js';
 import { loadSettings, SETTING_KEYS } from '../../services/settings.js';
-import { activity, funnel } from '../../services/stats.js';
+import { activity, funnel, startsBySource } from '../../services/stats.js';
 import { getTrip } from '../../services/trips.js';
 import { botLink, CHANNEL_SOURCE, DRIVER_SOURCE_PREFIX } from '../../services/links.js';
 import { getUser, setRestriction, sourceStats, userStats, type SourceStat } from '../../services/users.js';
@@ -137,13 +137,28 @@ async function sourceLabel(source: string | null): Promise<string> {
   return esc(source);
 }
 
-async function sourceLine(x: SourceStat): Promise<string> {
-  return t('src-line', { label: await sourceLabel(x.source), users: x.users, bookers: x.bookers, bookings: x.bookings, completed: x.completed });
+async function sourceLine(x: SourceStat & { starts: number }): Promise<string> {
+  return t('src-line', {
+    label: await sourceLabel(x.source),
+    starts: x.starts,
+    users: x.users,
+    bookers: x.bookers,
+    bookings: x.bookings,
+    completed: x.completed,
+  });
 }
 
 async function sourcesScreen(ctx: MyContext, days: number | null): Promise<void> {
   const since = days === null ? undefined : new Date(now().getTime() - days * 86_400_000);
-  const stats = await sourceStats(since);
+  const [registered, starts] = await Promise.all([sourceStats(since), startsBySource(since)]);
+  // Источники, откуда только нажимали «Старт», но ещё никто не зарегистрировался, тоже показываем.
+  const empty = { users: 0, bookers: 0, bookings: 0, completed: 0 };
+  const stats = [
+    ...registered.map((x) => ({ ...x, starts: starts.get(x.source) ?? 0 })),
+    ...[...starts]
+      .filter(([source]) => !registered.some((x) => x.source === source))
+      .map(([source, n]) => ({ source, starts: n, ...empty })),
+  ].sort((x, y) => y.starts - x.starts || y.users - x.users);
   const example = botLink('s_aigul');
   const text = [
     `<b>${days === null ? t('adm-sources-title-all') : t('adm-sources-title', { days })}</b>`,

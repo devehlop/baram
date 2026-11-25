@@ -19,6 +19,16 @@ export async function noteVisit(telegramId: number, text?: string): Promise<void
     .onConflictDoUpdate({ target: visitors.telegramId, set: { lastSeenAt: at } });
 }
 
+/** Сколько человек впервые написали боту по каждой метке источника. since — с этой даты. */
+export async function startsBySource(since?: Date): Promise<Map<string | null, number>> {
+  const rows = await app.db
+    .select({ source: visitors.source, n: sql<number>`count(*)::int` })
+    .from(visitors)
+    .where(since ? gte(visitors.firstSeenAt, since) : undefined)
+    .groupBy(visitors.source);
+  return new Map(rows.map((r) => [r.source, r.n]));
+}
+
 /** Путь новых людей: впервые пришли за период → что из этого вышло. */
 export interface Funnel {
   /** Нажали «Старт» (первое сообщение боту). */

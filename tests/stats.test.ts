@@ -92,6 +92,15 @@ describe('статистика в админке', () => {
     expect(admin.last()).toContain('Нажали «Старт»: 5');
   });
 
+  it('«Откуда приходят» показывает и тех, кто нажал «Старт», но не зарегистрировался', async () => {
+    await h.user(103).text('/start s_qr');
+    await h.user(104).text('/start s_qr');
+    const admin = h.user(ADMIN_ID);
+    await admin.text('/admin');
+    await admin.press('📈 Откуда приходят');
+    expect(admin.last()).toContain('qr: нажали «Старт» 2 · зарегистрировались 0');
+  });
+
   it('не админ статистику не видит', async () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await p.pressData('a:st:7');
