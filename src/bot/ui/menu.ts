@@ -1,8 +1,9 @@
 import { Keyboard } from 'grammy';
-import { isAdminTg } from '../../app.js';
+import { app, isAdminTg } from '../../app.js';
 import type { UserRow } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { getDriverRow } from '../../services/drivers.js';
+import { appOn, onMax } from '../platform.js';
 import { send } from '../tg.js';
 
 /** Подписи кнопок главного меню. Нажатие приходит боту обычным текстом. */
@@ -42,6 +43,8 @@ export async function mainKeyboard(user: UserRow): Promise<Keyboard> {
     k.text(t('menu-help')).text(t(driver ? 'menu-to-driver' : 'menu-become-driver'));
   }
   if (isAdminTg(user.telegramId)) k.row().text(t('menu-admin'));
+  // В Telegram приложение открывается кнопкой слева от поля ввода, а в MAX такой нет — кнопка в меню.
+  if (onMax(user.telegramId) && appOn(user.telegramId)) k.row().webApp(t('menu-app'), app.miniappUrl!);
   return k.resized().persistent();
 }
 

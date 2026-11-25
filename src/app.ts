@@ -18,6 +18,8 @@ export interface App {
   max?: MaxClient;
   /** Имя бота в MAX — для ссылок max.ru/<имя>?start=… */
   maxBotUsername?: string;
+  /** Mini App подключена и в MAX (MAX_MINIAPP): кнопки приложения показываются и там. */
+  maxMiniapp?: boolean;
 }
 
 export const app = {} as App;

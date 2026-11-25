@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { tg } from './tg';
+import { authHeader } from './tg';
 
 export class ApiError extends Error {
   constructor(
@@ -10,13 +10,13 @@ export class ApiError extends Error {
   }
 }
 
-/** Запрос к API. Подпись Telegram (initData) уходит в заголовке — сервер проверяет её на каждом запросе. */
+/** Запрос к API. Подпись мессенджера (initData Telegram или MAX) уходит в заголовке — сервер проверяет её на каждом запросе. */
 export async function api<T>(path: string, body?: unknown, method?: 'GET' | 'POST'): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
     headers: {
       'content-type': 'application/json',
-      ...(tg?.initData ? { authorization: `tma ${tg.initData}` } : {}),
+      ...authHeader(),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -39,7 +39,7 @@ const images = new Map<string, Promise<string | null>>();
 export function loadImage(path: string): Promise<string | null> {
   let p = images.get(path);
   if (!p) {
-    p = fetch(`/api${path}`, { headers: tg?.initData ? { authorization: `tma ${tg.initData}` } : {} })
+    p = fetch(`/api${path}`, { headers: authHeader() })
       .then(async (res) => {
         if (!res.ok) return null;
         const blob = await res.blob();

@@ -30,6 +30,8 @@ export class FakeMax {
   messages: MaxSent[] = [];
   answers: { callbackId: string; notification?: string }[] = [];
   calls: string[] = [];
+  /** Отвечать ошибкой на сообщения с кнопкой open_app (как если бы MAX её не принял). */
+  rejectOpenApp = false;
   seq = 0;
   private n = 0;
 
@@ -47,6 +49,8 @@ export class FakeMax {
       case 'GET /me':
         return json(`{"user_id":${MAX_BOT_ID},"username":"baram_max_bot","is_bot":true,"first_name":"Барам"}`);
       case 'POST /messages': {
+        const hasApp = JSON.stringify(body.attachments ?? []).includes('"open_app"');
+        if (this.rejectOpenApp && hasApp) return json('{"code":"proto.payload","message":"bad open_app"}', 400);
         const mid = `mid.${++this.n}`;
         this.messages.push({ userId: q.get('user_id')!, mid, seq: ++this.seq, text: body.text ?? '', format: body.format, ...parts(body.attachments) });
         // id пользователя — 64-битное число без кавычек, как в настоящем ответе.
