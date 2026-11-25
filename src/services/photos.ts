@@ -1,8 +1,10 @@
 import { app } from '../app.js';
 import { log } from '../logger.js';
+import { isMaxRef, loadMaxImage, MAX_REF } from '../max/files.js';
 
 /**
  * Картинки из Telegram для Mini App: фото машины из анкеты водителя и фото профиля.
+ * Фото, присланные в MAX («max:<токен>»), берутся из src/max/files.ts.
  * В базе лежат только file_id. Сами файлы скачиваются через Bot API и держатся в памяти:
  * ссылка на файл содержит токен бота, поэтому наружу отдаём байты, а не ссылку.
  */
@@ -42,6 +44,7 @@ function remember(fileId: string, img: Image | null): void {
 }
 
 async function download(fileId: string): Promise<Image | null> {
+  if (isMaxRef(fileId)) return loadMaxImage(fileId.slice(MAX_REF.length));
   try {
     const f = await app.api.getFile(fileId);
     if (!f.file_path) return null;

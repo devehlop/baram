@@ -12,6 +12,9 @@ const schema = z.object({
   PORT: z.string().default('8080'),
   MINIAPP_DEV_TG_ID: z.string().default(''),
   NODE_ENV: z.string().default(''),
+  MAX_BOT_TOKEN: z.string().default(''),
+  MAX_API_ROOT: z.string().default(''),
+  MAX_WEBHOOK_URL: z.string().default(''),
 });
 
 export interface Config {
@@ -28,6 +31,14 @@ export interface Config {
   port: number;
   /** Только вне production: открыть Mini App в браузере от имени этого Telegram ID. */
   miniappDevTelegramId?: number;
+  /** Бот в MAX. Пусто — бот работает только в Telegram. */
+  max?: {
+    token: string;
+    /** Свой адрес MAX Bot API; обычно пусто — https://platform-api2.max.ru. */
+    apiRoot?: string;
+    /** Адрес вебхука (https://…/max/webhook). Пусто — long polling, только для разработки. */
+    webhookUrl?: string;
+  };
 }
 
 export function parseAdminIds(raw: string): number[] {
@@ -54,6 +65,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     apiRoot: e.TELEGRAM_API_ROOT.trim() || undefined,
     miniappUrl: e.MINIAPP_URL.trim() || undefined,
     port: Number(e.PORT) || 8080,
+    max: e.MAX_BOT_TOKEN.trim()
+      ? { token: e.MAX_BOT_TOKEN.trim(), apiRoot: e.MAX_API_ROOT.trim() || undefined, webhookUrl: e.MAX_WEBHOOK_URL.trim() || undefined }
+      : undefined,
     miniappDevTelegramId: e.NODE_ENV !== 'production' && Number(e.MINIAPP_DEV_TG_ID) > 0 ? Number(e.MINIAPP_DEV_TG_ID) : undefined,
   };
 }

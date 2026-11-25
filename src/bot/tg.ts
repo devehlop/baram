@@ -37,7 +37,7 @@ function ignorable(e: unknown): boolean {
   // Пользователь остановил бота, чат не найден, сообщение не изменилось или слишком старое.
   return (
     e.error_code === 403 ||
-    /chat not found|message is not modified|message to edit not found|message can't be edited|query is too old|message to delete not found/i.test(
+    /chat not found|message is not modified|message to edit not found|message can't be edited|query is too old|message to delete not found|message can't be deleted/i.test(
       e.description,
     )
   );
@@ -72,8 +72,9 @@ export async function removeIncoming(chatId: number, messageId: number): Promise
   const key = `${chatId}:${messageId}`;
   const before = lastBefore.get(key);
   lastBefore.delete(key);
-  await deleteMessage(chatId, messageId);
-  if (lastInChat.get(chatId) === messageId && before !== undefined) lastInChat.set(chatId, before);
+  // В MAX бот не может удалить сообщение человека: тогда оно остаётся последним, и окно придёт заново под ним.
+  const removed = await deleteMessage(chatId, messageId);
+  if (removed && lastInChat.get(chatId) === messageId && before !== undefined) lastInChat.set(chatId, before);
 }
 
 /** Сообщение — самое нижнее в чате: после него никто ничего не писал. */
@@ -159,11 +160,14 @@ export async function clearKeyboard(chatId: number, messageId: number): Promise<
   }
 }
 
-export async function deleteMessage(chatId: number, messageId: number): Promise<void> {
+/** Удалить сообщение. false — не получилось (уже удалено, слишком старое, чужое в MAX). */
+export async function deleteMessage(chatId: number, messageId: number): Promise<boolean> {
   try {
     await app.api.deleteMessage(chatId, messageId);
+    return true;
   } catch (e) {
     if (!ignorable(e)) log.warn({ err: e, chatId }, 'Не удалось удалить сообщение');
+    return false;
   }
 }
 

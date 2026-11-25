@@ -4,6 +4,7 @@ import { Bot, type ApiClientOptions } from 'grammy';
 import { isAdminTg } from '../app.js';
 import { t } from '../i18n.js';
 import { log } from '../logger.js';
+import { maxRouter } from '../max/outgoing.js';
 import { noteVisit } from '../services/stats.js';
 import { getUserByTg } from '../services/users.js';
 import type { MyContext } from './context.js';
@@ -20,6 +21,8 @@ import { menuKeyOf } from './ui/menu.js';
 export function createBot(token: string, client?: ApiClientOptions): Bot<MyContext> {
   const bot = new Bot<MyContext>(token, { client });
   bot.api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 20 }));
+  // Сообщения людям из MAX уходят в MAX: бот один, платформы две (src/max/outgoing.ts).
+  bot.api.config.use(maxRouter());
 
   bot.catch(async (err) => {
     log.error({ err: err.error, update: err.ctx.update.update_id }, 'Ошибка при обработке сообщения');

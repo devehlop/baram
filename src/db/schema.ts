@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   doublePrecision,
   index,
   integer,
@@ -394,6 +395,35 @@ export const conversationStates = pgTable('conversation_states', {
   key: text('key').primaryKey(),
   data: jsonb('data').notNull(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+/**
+ * Пользователи MAX. Бот внутри работает с числовыми id, как в Telegram, поэтому каждому
+ * человеку из MAX выдаётся свой номер: MAX_ID_BASE + id (src/max/ids.ts). Этот номер и лежит
+ * в users.telegram_id, visitors.telegram_id и ADMIN_IDS. id в MAX — 64-битный, храним строкой.
+ */
+export const maxUsers = pgTable('max_users', {
+  id: serial('id').primaryKey(),
+  maxUserId: text('max_user_id').notNull().unique(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => 'bytea',
+  fromDriver: (v) => new Uint8Array(v),
+  toDriver: (v) => Buffer.from(v),
+});
+
+/**
+ * Фото, присланные в MAX (машина водителя). Ссылка на файл у MAX временная, а показывать фото
+ * нужно и через неделю — админу в Telegram, в Mini App. Поэтому байты храним сами, ключ — токен
+ * картинки в MAX (по нему же фото снова отправляется в MAX).
+ */
+export const maxFiles = pgTable('max_files', {
+  token: text('token').primaryKey(),
+  bytes: bytea('bytes').notNull(),
+  type: text('type').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
 });
 
 export type UserRow = typeof users.$inferSelect;
