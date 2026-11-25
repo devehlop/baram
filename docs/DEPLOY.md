@@ -268,10 +268,10 @@ printf "TELEGRAM_API_ROOT=https://PROXY_IP_DASHED.sslip.io:8443\nNODE_EXTRA_CA_C
    printf "MAX_BOT_TOKEN=ваш_токен\nMINIAPP_DOMAIN=MAIN_IP_DASHED.sslip.io\nMAX_WEBHOOK_URL=https://MAIN_IP_DASHED.sslip.io/max/webhook\n" >> ~/baram/.env
    ```
 
-3. Сервер MAX `platform-api2.max.ru` работает на сертификате Минцифры, а Node.js ему по умолчанию не доверяет. Скачайте корневой и промежуточный сертификаты с Госуслуг в папку `certs`:
+3. Сервер MAX `platform-api2.max.ru` работает на сертификате Минцифры, а Node.js ему по умолчанию не доверяет. Скачайте корневой и промежуточный сертификаты с Госуслуг в папку `certs`. Файлы с Госуслуг не заканчиваются переводом строки, поэтому между ними нужен `echo`: без него сертификаты склеятся в одну строку, и Node.js отбросит весь файл.
 
    ```bash
-   mkdir -p ~/baram/certs && curl -fsSL https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt > ~/baram/certs/max-ca.crt
+   mkdir -p ~/baram/certs && cd ~/baram/certs && { curl -fsSL https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt; echo; curl -fsSL https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt; echo; } > max-ca.crt
    ```
 
    Node.js берёт дополнительные сертификаты только из одного файла. Если прокладка до Telegram не настроена, добавьте в `.env`:
@@ -280,10 +280,16 @@ printf "TELEGRAM_API_ROOT=https://PROXY_IP_DASHED.sslip.io:8443\nNODE_EXTRA_CA_C
    echo "NODE_EXTRA_CA_CERTS=/certs/max-ca.crt" >> ~/baram/.env
    ```
 
-   Если прокладка уже настроена (в `.env` есть `NODE_EXTRA_CA_CERTS=/certs/tg-proxy.crt`), допишите сертификат прокладки в общий файл, а в `.env` замените `tg-proxy.crt` на `max-ca.crt`:
+   Если прокладка уже настроена (в `.env` есть `NODE_EXTRA_CA_CERTS=/certs/tg-proxy.crt`), допишите сертификат прокладки в общий файл, а в `.env` замените `tg-proxy.crt` на `max-ca.crt`. **Без сертификата прокладки в общем файле бот перестанет доставать до Telegram.**
 
    ```bash
-   cat ~/baram/certs/tg-proxy.crt >> ~/baram/certs/max-ca.crt && sed -i 's|/certs/tg-proxy.crt|/certs/max-ca.crt|' ~/baram/.env
+   { cat ~/baram/certs/tg-proxy.crt; echo; } >> ~/baram/certs/max-ca.crt && sed -i 's|/certs/tg-proxy.crt|/certs/max-ca.crt|' ~/baram/.env
+   ```
+
+   Проверьте файл. Должны быть строки `subject=` для Russian Trusted Root CA и Russian Trusted Sub CA, а с прокладкой — ещё одна, `Caddy Local Authority`. Если команда выдаёт ошибку, файл склеен неправильно: соберите его заново.
+
+   ```bash
+   openssl crl2pkcs7 -nocrl -certfile ~/baram/certs/max-ca.crt | openssl pkcs7 -print_certs -noout | grep subject
    ```
 
 4. Перезапустите бота. Скрипт сам поднимет контейнер с HTTPS, потому что в `.env` есть `MINIAPP_DOMAIN`:
@@ -300,7 +306,17 @@ printf "TELEGRAM_API_ROOT=https://PROXY_IP_DASHED.sslip.io:8443\nNODE_EXTRA_CA_C
 
    Если там `MAX: не удалось подключиться` и в ошибке есть `certificate`, значит, не подхватился сертификат из шага 3. Бот в Telegram при этом продолжает работать, а подключиться к MAX пробует раз в минуту.
 
-6. Напишите боту в MAX, отправьте `/id` и впишите число в `ADMIN_IDS`, если хотите быть админом и там. Это отдельный ID, не тот, что в Telegram.
+   Если в логе есть `Ignoring extra certs from /certs/max-ca.crt`, файл из шага 3 испорчен, и Node.js не доверяет ни одному сертификату из него. С прокладкой это значит, что не работает и Telegram. Соберите файл заново по шагу 3.
+
+   **После любой правки сертификатов перезапустите контейнер бота принудительно.** Node.js читает их только при запуске, а `deploy.sh` не пересоздаёт контейнер, если код не менялся:
+
+   ```bash
+   cd ~/baram && docker compose -f docker-compose.prod.yml up -d --force-recreate bot
+   ```
+
+6. Напишите боту в MAX, отправьте `/id` и допишите число через запятую в `ADMIN_IDS`, если хотите быть админом и там. Это отдельный ID, не тот, что в Telegram. После правки `.env` перезапустите контейнер бота той же командой с `--force-recreate`.
+
+   Не запускайте `deploy.sh` вручную, пока идёт автодеплой из GitHub: два перезапуска одновременно не поделят контейнер (`Conflict. The container name … is already in use`).
 
 Чем бот в MAX отличается от Telegram:
 - Главное меню — кнопки под сообщением, а не внизу экрана. Позвать его заново можно командой `/menu`.
