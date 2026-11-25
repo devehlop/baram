@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { acceptBookingAction, completeTripAction, submitBooking } from '../src/bot/actions.js';
 import { visitors } from '../src/db/schema.js';
+import { declineBooking } from '../src/services/bookings.js';
 import { activity, funnel } from '../src/services/stats.js';
 import { ADMIN_ID, approvedDriver, dbId, passenger, postTrip, setClock, setup, type Harness } from './helpers.js';
 
@@ -90,6 +91,27 @@ describe('статистика в админке', () => {
     await admin.press('Всё время');
     expect(admin.last()).toContain('Статистика за всё время');
     expect(admin.last()).toContain('Нажали «Старт»: 5');
+  });
+
+  it('бронь, которую отклонил водитель, не делает человека «забронировавшим»', async () => {
+    await approvedDriver(h, 201, 'Ильдар', '+79170000001');
+    await (await passenger(h, 101, 'Айгуль', '+79170000002')).text('/start');
+    const trip = await postTrip(201, { time: '10:00' });
+    const res = await submitBooking({
+      tripId: trip.id,
+      bookedBy: await dbId(101),
+      passenger: { name: 'Айгуль', phone: '+79170000002', type: 'adult' },
+      from: { localityId: 1, address: 'ул. Ленина, 12' },
+      to: { localityId: 2, address: 'ул. Деловая, 7' },
+      seats: 1,
+      childSeat: 'none',
+      baggage: 'bag',
+      baggageNote: null,
+    });
+    if (!res.ok) throw new Error(res.reason);
+    expect((await funnel()).booked).toBe(1);
+    await declineBooking(res.booking.id);
+    expect((await funnel()).booked).toBe(0);
   });
 
   it('«Откуда приходят» показывает и тех, кто нажал «Старт», но не зарегистрировался', async () => {

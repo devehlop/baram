@@ -49,7 +49,7 @@ export interface Funnel {
   started: number;
   /** Из них прошли регистрацию. */
   registered: number;
-  /** Из них оформили хотя бы одну бронь. */
+  /** Из них оформили хотя бы одну бронь, которую не отклонили водитель или админ. */
   booked: number;
   /** Из них хотя бы раз доехали. */
   rode: number;
@@ -100,7 +100,7 @@ export async function funnel(since?: Date): Promise<Funnel> {
     .select({
       started: sql<number>`count(*)::int`,
       registered: sql<number>`count(${users.id})::int`,
-      booked: sql<number>`count(${users.id}) filter (where ${hasBooking(sql`true`)})::int`,
+      booked: sql<number>`count(${users.id}) filter (where ${hasBooking(sql`${bookings.status} <> 'declined'`)})::int`,
       rode: sql<number>`count(${users.id}) filter (where ${hasBooking(sql`${bookings.status} = 'completed'`)})::int`,
       drivers: sql<number>`count(${drivers.userId})::int`,
     })
