@@ -4,6 +4,7 @@ import { Bot, type ApiClientOptions } from 'grammy';
 import { isAdminTg } from '../app.js';
 import { t } from '../i18n.js';
 import { log } from '../logger.js';
+import { noteVisit } from '../services/stats.js';
 import { getUserByTg } from '../services/users.js';
 import type { MyContext } from './context.js';
 import { driverForm, driverPhotos } from './conversations/driverForm.js';
@@ -34,6 +35,8 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
     if (ctx.message) noteIncoming(ctx.chat.id, ctx.message.message_id);
     ctx.user = ctx.from ? await getUserByTg(ctx.from.id) : undefined;
     ctx.isAdmin = isAdminTg(ctx.from?.id);
+    // Для статистики: первое касание — это «нажал Старт». Админов не считаем, сбой учёта не мешает человеку.
+    if (ctx.from && !ctx.isAdmin) await noteVisit(ctx.from.id, ctx.message?.text).catch((err) => log.warn({ err }, 'Не удалось отметить визит'));
     if (ctx.user?.restriction === 'blocked' && !ctx.isAdmin) {
       if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
       await send(ctx.chat.id, t('blocked-message'), { remove_keyboard: true });

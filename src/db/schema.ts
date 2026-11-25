@@ -61,6 +61,22 @@ export const users = pgTable('users', {
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
+/**
+ * Все, кто хоть раз написал боту, даже без регистрации: так видно, сколько человек нажали «Старт».
+ * Строка появляется при первом сообщении или нажатии кнопки, lastSeenAt обновляется при каждом.
+ */
+export const visitors = pgTable(
+  'visitors',
+  {
+    telegramId: bigint('telegram_id', { mode: 'number' }).primaryKey(),
+    /** Метка из ссылки при самом первом касании, в том же виде, что users.source. Не перезаписывается. */
+    source: text('source'),
+    firstSeenAt: ts('first_seen_at').notNull().defaultNow(),
+    lastSeenAt: ts('last_seen_at').notNull().defaultNow(),
+  },
+  (t) => [index('visitors_first_seen').on(t.firstSeenAt), index('visitors_last_seen').on(t.lastSeenAt)],
+);
+
 /** Анкета водителя. Без статуса approved рейсы не публикуются. */
 export const drivers = pgTable('drivers', {
   userId: integer('user_id')
