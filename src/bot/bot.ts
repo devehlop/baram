@@ -33,10 +33,14 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
   pm.use(async (ctx, next) => {
     // Запоминаем порядок сообщений в чате: по нему «окно» решает, обновиться на месте или прийти заново.
     if (ctx.message) noteIncoming(ctx.chat.id, ctx.message.message_id);
-    ctx.user = ctx.from ? await getUserByTg(ctx.from.id) : undefined;
     ctx.isAdmin = isAdminTg(ctx.from?.id);
-    // Для статистики: первое касание — это «нажал Старт». Админов не считаем, сбой учёта не мешает человеку.
-    if (ctx.from && !ctx.isAdmin) await noteVisit(ctx.from.id, ctx.message?.text).catch((err) => log.warn({ err }, 'Не удалось отметить визит'));
+    // Для статистики: первое касание — это «нажал Старт». Идёт параллельно с загрузкой пользователя,
+    // админов не считаем, сбой учёта не мешает человеку.
+    const visit =
+      ctx.from && !ctx.isAdmin
+        ? noteVisit(ctx.from.id, ctx.message?.text).catch((err) => log.warn({ err }, 'Не удалось отметить визит'))
+        : undefined;
+    [ctx.user] = await Promise.all([ctx.from ? getUserByTg(ctx.from.id) : undefined, visit]);
     if (ctx.user?.restriction === 'blocked' && !ctx.isAdmin) {
       if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
       await send(ctx.chat.id, t('blocked-message'), { remove_keyboard: true });

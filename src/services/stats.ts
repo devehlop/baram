@@ -10,9 +10,16 @@ import { sourceOf, startPayloadOf } from './links.js';
  * она пишется до регистрации, поэтому видны и те, кто ушёл, не заполнив анкету.
  */
 export async function noteVisit(telegramId: number, text?: string): Promise<void> {
+  const at = now();
+  // Обычно человек уже известен: хватает одного запроса, метку источника не ищем.
+  const seen = await app.db
+    .update(visitors)
+    .set({ lastSeenAt: at })
+    .where(eq(visitors.telegramId, telegramId))
+    .returning({ telegramId: visitors.telegramId });
+  if (seen.length) return;
   const payload = startPayloadOf(text);
   const source = payload ? await sourceOf(payload) : null;
-  const at = now();
   await app.db
     .insert(visitors)
     .values({ telegramId, source, firstSeenAt: at, lastSeenAt: at })
