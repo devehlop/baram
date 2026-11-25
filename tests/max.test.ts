@@ -1,17 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/app.js';
 import { createApi } from '../src/api/server.js';
+import { signInitData, verifyMaxInitData } from '../src/api/auth.js';
 import { sendPhotos } from '../src/bot/tg.js';
 import { maxFiles } from '../src/db/schema.js';
 import { parseMaxJson } from '../src/max/client.js';
 import { isMaxId, localIdOf, MAX_ID_BASE } from '../src/max/ids.js';
-import { maxKeyboard } from '../src/max/outgoing.js';
+import { maxKeyboard, startParamOf } from '../src/max/outgoing.js';
 import { botLink } from '../src/services/links.js';
 import { getImage } from '../src/services/photos.js';
 import { getUserByTg, createUser } from '../src/services/users.js';
 import { submitDriverForm } from '../src/services/drivers.js';
 import { ADMIN_ID, approvedDriver, postTrip, setup, type Harness } from './helpers.js';
-import { withMax, type MaxHarness } from './max-helpers.js';
+import { MAX_TOKEN, withMax, type MaxHarness } from './max-helpers.js';
 
 // Вторник, 10 ноября 2026, 09:00 по Москве.
 const NOW = '2026-11-10T06:00:00Z';
@@ -203,5 +204,82 @@ describe('MAX: вебхук', () => {
     const ok = await api.request('/max/webhook', { method: 'POST', body, headers: { 'x-max-bot-api-secret': 'secret-1' } });
     expect(ok.status).toBe(200);
     expect((got[0] as any).user.user_id).toBe(AIGUL);
+  });
+});
+
+describe('MAX: Mini App', () => {
+  const user = `{"id":${AIGUL},"first_name":"Айгуль"}`;
+
+  it('подпись MAX: проверяется токеном бота в MAX, id не теряет точность', () => {
+    const data = signInitData(user, MAX_TOKEN);
+    expect(verifyMaxInitData(data, MAX_TOKEN)).toMatchObject({ id: AIGUL, first_name: 'Айгуль' });
+    // MAX может отдать строку закодированной целиком.
+    expect(verifyMaxInitData(encodeURIComponent(data), MAX_TOKEN)?.id).toBe(AIGUL);
+    expect(verifyMaxInitData(data, '1:TEST')).toBeNull();
+    expect(verifyMaxInitData(data.replace('9123456789012345678', '9123456789012345679'), MAX_TOKEN)).toBeNull();
+    const old = signInitData(user, MAX_TOKEN, Math.floor(Date.now() / 1000) - 2 * 24 * 3600);
+    expect(verifyMaxInitData(old, MAX_TOKEN)).toBeNull();
+  });
+
+  it('вход из MAX: тот же человек, что в чат-боте MAX; ссылки ведут к боту в MAX', async () => {
+    const api = createApi({ botToken: '1:TEST', maxBotToken: MAX_TOKEN });
+    const me = async (auth: string) => {
+      const res = await api.request('/api/me', { headers: { authorization: auth } });
+      return { status: res.status, json: (await res.json()) as any };
+    };
+    const maxAuth = `max ${signInitData(user, MAX_TOKEN)}`;
+    expect(await me(maxAuth)).toMatchObject({ status: 200, json: { registered: false, botUsername: 'baram_max_bot' } });
+    await createUser({ telegramId: await localIdOf(AIGUL), name: 'Айгуль', phone: '+79170000002', role: 'passenger' });
+    expect(await me(maxAuth)).toMatchObject({ status: 200, json: { registered: true, user: { name: 'Айгуль' } } });
+    // Подпись MAX не подходит как подпись Telegram, и наоборот.
+    expect((await me(`tma ${signInitData(user, MAX_TOKEN)}`)).status).toBe(401);
+    expect((await me(`max ${signInitData(user, '1:TEST')}`)).status).toBe(401);
+    // Без токена MAX вход из MAX выключен.
+    const tgOnly = createApi({ botToken: '1:TEST' });
+    expect((await tgOnly.request('/api/me', { headers: { authorization: maxAuth } })).status).toBe(401);
+  });
+
+  it('параметр запуска из адреса кнопки', () => {
+    expect(startParamOf('https://app.example.ru/?screen=board&route=1-a&day=2026-11-10')).toBe('board_1-a_2026-11-10');
+    expect(startParamOf('https://app.example.ru/?screen=board')).toBe('board');
+    expect(startParamOf('https://app.example.ru/')).toBeUndefined();
+  });
+
+  it('кнопки приложения в MAX — только когда оно там подключено', async () => {
+    const markup = { inline_keyboard: [[{ text: '📱 Открыть в приложении', web_app: { url: 'https://app.example.ru/?screen=board&route=1-a&day=2026-11-10' } }]] };
+    expect(maxKeyboard(markup)).toBeNull();
+    app.maxMiniapp = true;
+    expect(maxKeyboard(markup)!.payload.buttons).toEqual([
+      [{ type: 'open_app', text: '📱 Открыть в приложении', web_app: 'baram_max_bot', payload: 'board_1-a_2026-11-10' }],
+    ]);
+  });
+
+  it('меню и тексты в MAX ведут в приложение, если оно подключено', async () => {
+    app.miniappUrl = 'https://app.example.ru';
+    app.maxMiniapp = true;
+    const id = await localIdOf(AIGUL);
+    await createUser({ telegramId: id, name: 'Айгуль', phone: '+79170000002', role: 'passenger' });
+    const u = mx.user(AIGUL, 'Айгуль');
+    await u.text('/menu');
+    expect(u.rawButtons()).toContainEqual({ type: 'open_app', text: '📱 Приложение', web_app: 'baram_max_bot' });
+    await u.press('☎️ Помощь');
+    expect(u.last()).toContain('кнопка «📱 Приложение» в меню');
+    expect(u.last()).not.toContain('слева от поля ввода');
+
+    const v = mx.user('42', 'Ильдар');
+    await v.start();
+    expect(v.last()).toContain('кнопка «📱 Приложение» в меню');
+  });
+
+  it('если MAX не принял кнопку приложения, экран приходит без неё', async () => {
+    app.miniappUrl = 'https://app.example.ru';
+    app.maxMiniapp = true;
+    mx.fake.rejectOpenApp = true;
+    const id = await localIdOf(AIGUL);
+    await createUser({ telegramId: id, name: 'Айгуль', phone: '+79170000002', role: 'passenger' });
+    const u = mx.user(AIGUL, 'Айгуль');
+    await u.text('/menu');
+    expect(u.buttons()).toContain('🚗 Найти поездку');
+    expect(u.rawButtons().some((b) => b.type === 'open_app')).toBe(false);
   });
 });
