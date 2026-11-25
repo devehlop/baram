@@ -1,4 +1,4 @@
-import { eq, gte, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, notInArray, sql, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { app } from '../app.js';
 import { bookings, drivers, requests, trips, users, visitors } from '../db/schema.js';
@@ -31,7 +31,7 @@ export async function startsBySource(since?: Date): Promise<Map<string | null, n
     .select({ source, n: sql<number>`count(*)::int` })
     .from(visitors)
     .leftJoin(users, eq(users.telegramId, visitors.telegramId))
-    .where(since ? gte(visitors.firstSeenAt, since) : undefined)
+    .where(and(since ? gte(visitors.firstSeenAt, since) : undefined, notAdmin(visitors.telegramId)))
     .groupBy(source);
   return new Map(rows.map((r) => [r.source, r.n]));
 }
@@ -54,7 +54,7 @@ export interface Funnel {
 export interface Activity {
   /** Писали боту за период (для «всё время» — все, кто когда-либо писал). */
   active: number;
-  /** Зарегистрированы всего, на сегодня. */
+  /** Зарегистрированы всего, на сегодня, без админов. */
   usersTotal: number;
   /** Водители в работе и ждущие проверки — на сегодня. */
   driversApproved: number;
@@ -77,6 +77,12 @@ export interface Activity {
   requestsTaken: number;
 }
 
+/**
+ * Админов в статистике нет: бот их не отмечает, а зарегистрированных до появления visitors
+ * миграция перенесла вместе со всеми — отсекаем их по Telegram ID из настроек.
+ */
+const notAdmin = (col: AnyPgColumn): SQL | undefined => (app.adminIds.length ? notInArray(col, app.adminIds) : undefined);
+
 /** Событие случилось за период: дата не пустая и не раньше since. */
 const within = (col: AnyPgColumn, since?: Date): SQL => (since ? sql`${col} >= ${since.toISOString()}::timestamptz` : sql`${col} is not null`);
 
@@ -94,7 +100,7 @@ export async function funnel(since?: Date): Promise<Funnel> {
     .from(visitors)
     .leftJoin(users, eq(users.telegramId, visitors.telegramId))
     .leftJoin(drivers, eq(drivers.userId, users.id))
-    .where(since ? gte(visitors.firstSeenAt, since) : undefined);
+    .where(and(since ? gte(visitors.firstSeenAt, since) : undefined, notAdmin(visitors.telegramId)));
   return row ?? { started: 0, registered: 0, booked: 0, rode: 0, drivers: 0 };
 }
 
@@ -103,8 +109,11 @@ export async function activity(since?: Date): Promise<Activity> {
     app.db
       .select({ active: sql<number>`count(*)::int` })
       .from(visitors)
-      .where(since ? gte(visitors.lastSeenAt, since) : undefined),
-    app.db.select({ usersTotal: sql<number>`count(*)::int` }).from(users),
+      .where(and(since ? gte(visitors.lastSeenAt, since) : undefined, notAdmin(visitors.telegramId))),
+    app.db
+      .select({ usersTotal: sql<number>`count(*)::int` })
+      .from(users)
+      .where(notAdmin(users.telegramId)),
     app.db
       .select({
         driversApproved: sql<number>`count(*) filter (where ${drivers.status} = 'approved')::int`,

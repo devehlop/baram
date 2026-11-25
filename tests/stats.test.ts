@@ -116,6 +116,18 @@ describe('статистика в админке', () => {
     expect(admin.last()).not.toContain('Без метки');
   });
 
+  it('админов в статистике нет, даже перенесённых миграцией из зарегистрированных', async () => {
+    // Так выглядит админ, который зарегистрировался до появления учёта «Старта».
+    await h.db.insert(visitors).values({ telegramId: ADMIN_ID, source: 'qr', firstSeenAt: new Date(NOW), lastSeenAt: new Date(NOW) });
+    await h.user(103).text('/start s_qr');
+    expect((await funnel()).started).toBe(1);
+    expect((await activity()).active).toBe(1);
+    const admin = h.user(ADMIN_ID);
+    await admin.text('/admin');
+    await admin.press('📈 Откуда приходят');
+    expect(admin.last()).toContain('qr: нажали «Старт» 1 ·');
+  });
+
   it('не админ статистику не видит', async () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await p.pressData('a:st:7');
