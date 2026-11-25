@@ -17,6 +17,7 @@ import { getUser, setRestriction, sourceStats, userStats, type SourceStat } from
 import { adminBookingDecision, closeRequestByAdmin, offerRequest, reviewDriver, showDriverForReview } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
+import { onMax } from '../platform.js';
 import { kb, type Btn } from '../tg.js';
 import { bookingForDriver, complaintCard, ratingOrNone, requestCard, starsText, timeLabel } from '../ui/cards.js';
 import { num, show, toast } from './shared.js';
@@ -339,7 +340,7 @@ async function userScreen(ctx: MyContext, userId: number): Promise<void> {
   const bad = d ? await lowRatings(userId, 'driver') : [];
   const text = [
     `<b>${esc(u.name)}</b> · ${fmtPhone(u.phone)}`,
-    `Telegram ID: <code>${u.telegramId}</code>${u.username ? ` · @${esc(u.username)}` : ''}`,
+    `${onMax(u.telegramId) ? 'ID в боте (MAX)' : 'Telegram ID'}: <code>${u.telegramId}</code>${u.username ? ` · @${esc(u.username)}` : ''}`,
     t('adm-user-stats', { completed: st.completed, noShows: st.noShows, lateCancels: st.lateCancels }),
     `${t('label-passenger-rating')}: ${ratingOrNone(asPassenger)}`,
     asDriver && `${t('adm-driver-rating')}: ${ratingOrNone(asDriver)}`,

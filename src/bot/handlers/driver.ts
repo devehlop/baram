@@ -29,6 +29,7 @@ import {
 } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
+import { onMax } from '../platform.js';
 import { kb, send, type Btn } from '../tg.js';
 import { bookingForDriver, driverCard, starsRow, starsText, tripCard } from '../ui/cards.js';
 import { canShare, shareRows, shareText } from '../ui/share.js';
@@ -158,12 +159,14 @@ driver.callbackQuery(/^d:sh:(\d+)$/, async (ctx) => {
   const trip = await getTrip(num(ctx));
   if (!trip || trip.driverId !== ctx.user!.id) return toast(ctx, t('not-found'), true);
   if (!canShare(trip)) return toast(ctx, t('share-not-available'), true);
-  const link = tripShareLink(trip.id);
+  const chatId = ctx.chat!.id;
+  const link = tripShareLink(trip.id, chatId);
   if (!link) return toast(ctx, t('action-not-available'), true);
   await ctx.answerCallbackQuery();
   // Сначала само объявление — его можно переслать или скопировать в WhatsApp и VK; номер водитель допишет сам.
-  await send(ctx.chat!.id, esc(shareText(trip, link)));
-  await send(ctx.chat!.id, t('share-hint'), kb([...shareRows(trip, link), [{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]));
+  await send(chatId, esc(shareText(trip, link)));
+  const max = onMax(chatId);
+  await send(chatId, t(max ? 'share-hint-max' : 'share-hint'), kb([...shareRows(trip, link, max), [{ text: t('btn-to-trip'), data: `d:t:${trip.id}` }]]));
 });
 
 driver.callbackQuery(/^d:go:(\d+)$/, async (ctx) => {

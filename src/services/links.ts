@@ -1,4 +1,5 @@
 import { app } from '../app.js';
+import { isMaxId } from '../max/ids.js';
 import { getTrip } from './trips.js';
 
 /**
@@ -36,13 +37,21 @@ export function startPayloadOf(text: string | undefined): string | null {
   return m ? m[1]! : null;
 }
 
-/** Ссылка на бота с меткой. Без имени бота (не запущен) — null. */
-export function botLink(payload?: string): string | null {
+/**
+ * Ссылка на бота с меткой. Без имени бота (не запущен) — null.
+ * forChat — для кого ссылка: человеку из MAX — на бота в MAX (max.ru/<бот>?start=…, метка до 128 символов).
+ */
+export function botLink(payload?: string, forChat?: number): string | null {
+  if (isMaxId(forChat)) {
+    if (!app.maxBotUsername) return null;
+    return `https://max.ru/${app.maxBotUsername}${payload ? `?start=${payload}` : ''}`;
+  }
   if (!app.botUsername) return null;
   return `https://t.me/${app.botUsername}${payload ? `?start=${payload}` : ''}`;
 }
 
-export const tripShareLink = (tripId: number) => botLink(`t_${tripId}`);
+/** Рейс, которым делится водитель: ссылка на бота в том мессенджере, где водитель. */
+export const tripShareLink = (tripId: number, forChat?: number) => botLink(`t_${tripId}`, forChat);
 export const tripChannelLink = (tripId: number) => botLink(`c_${tripId}`);
 
 /**
