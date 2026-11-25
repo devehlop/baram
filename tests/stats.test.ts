@@ -80,7 +80,7 @@ describe('статистика в админке', () => {
     expect(text).toContain('Зарегистрировались: 3 · 60%');
     expect(text).toContain('Забронировали поездку: 1 · 20%');
     expect(text).toContain('Доехали: 1 · 20%');
-    expect(text).toContain('Ушли, не зарегистрировавшись: 2');
+    expect(text).toContain('Пока не зарегистрировались: 2');
     expect(text).toContain('Довезли пассажиров: 2');
 
     // Через месяц «за 7 дней» пусто, а «за всё время» — все.

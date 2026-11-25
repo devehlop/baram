@@ -397,7 +397,7 @@ adm-stats-funnel =
     🎫 Забронировали поездку: { $booked }{ $bookedPct }
     ✅ Доехали: { $rode }{ $rodePct }
     🚘 Подали анкету водителя: { $drivers }
-    Ушли, не зарегистрировавшись: { $left }
+    Пока не зарегистрировались: { $left }
 adm-stats-trips =
     <b>Поездки</b>
     Рейсов выложено: { $posted } · состоялось: { $completed } · отменено: { $cancelled }
