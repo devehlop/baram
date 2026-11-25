@@ -4,6 +4,7 @@ import { Bot, type ApiClientOptions } from 'grammy';
 import { isAdminTg } from '../app.js';
 import { t } from '../i18n.js';
 import { log } from '../logger.js';
+import { noteVisit } from '../services/stats.js';
 import { getUserByTg } from '../services/users.js';
 import type { MyContext } from './context.js';
 import { driverForm, driverPhotos } from './conversations/driverForm.js';
@@ -32,8 +33,14 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
   pm.use(async (ctx, next) => {
     // Запоминаем порядок сообщений в чате: по нему «окно» решает, обновиться на месте или прийти заново.
     if (ctx.message) noteIncoming(ctx.chat.id, ctx.message.message_id);
-    ctx.user = ctx.from ? await getUserByTg(ctx.from.id) : undefined;
     ctx.isAdmin = isAdminTg(ctx.from?.id);
+    // Для статистики: первое касание — это «нажал Старт». Идёт параллельно с загрузкой пользователя,
+    // админов не считаем, сбой учёта не мешает человеку.
+    const visit =
+      ctx.from && !ctx.isAdmin
+        ? noteVisit(ctx.from.id, ctx.message?.text).catch((err) => log.warn({ err }, 'Не удалось отметить визит'))
+        : undefined;
+    [ctx.user] = await Promise.all([ctx.from ? getUserByTg(ctx.from.id) : undefined, visit]);
     if (ctx.user?.restriction === 'blocked' && !ctx.isAdmin) {
       if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
       await send(ctx.chat.id, t('blocked-message'), { remove_keyboard: true });

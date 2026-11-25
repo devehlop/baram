@@ -381,10 +381,39 @@ adm-villages-near = У города { $city }
 adm-village-add = + Деревня у города { $city }
 adm-village-ask = Напишите название деревни или села.
 adm-village-added = Добавлено: { $name }.
+adm-stats = 📊 Статистика
+adm-stats-title = 📊 Статистика { $period }
+adm-stats-period-today = за сегодня
+adm-stats-period-days = за { $days } дней
+adm-stats-period-all = за всё время
+adm-stats-today = Сегодня
+adm-stats-7 = 7 дней
+adm-stats-30 = 30 дней
+adm-stats-all = Всё время
+adm-stats-funnel =
+    <b>Новые люди</b>
+    👋 Нажали «Старт»: { $started }
+    📝 Зарегистрировались: { $registered }{ $registeredPct }
+    🎫 Забронировали поездку: { $booked }{ $bookedPct }
+    ✅ Доехали: { $rode }{ $rodePct }
+    🚘 Подали анкету водителя: { $drivers }
+    Пока не зарегистрировались: { $left }
+adm-stats-trips =
+    <b>Поездки</b>
+    Рейсов выложено: { $posted } · состоялось: { $completed } · отменено: { $cancelled }
+    Броней: { $bookings } · доехали: { $bookingsCompleted } · отменили: { $bookingsCancelled } · не пришли: { $noShows }
+    Довезли пассажиров: { $seats } · на сумму { $revenue }
+    Заявок без рейса: { $requests } · взяли водители: { $requestsTaken }
+adm-stats-people =
+    <b>Люди</b>
+    Писали боту за этот срок: { $active }
+    Зарегистрировано всего: { $usersTotal }
+    Водителей в работе: { $driversApproved } · ждут проверки: { $driversPending } · новых анкет: { $driverForms }
+adm-stats-note = Проценты — от нажавших «Старт». Новые люди считаются по дню первого сообщения боту.
 adm-sources = 📈 Откуда приходят
 adm-sources-title = Откуда пришли люди за { $days } дней
 adm-sources-title-all = Откуда пришли люди за всё время
-adm-sources-empty = Пока никто не зарегистрировался.
+adm-sources-empty = Пока никто не приходил.
 adm-sources-30 = За 30 дней
 adm-sources-all = За всё время
 adm-sources-howto =
@@ -394,7 +423,7 @@ adm-sources-howto =
 src-none = Без метки
 src-channel = Канал направления
 src-driver = Рейс водителя { $name }
-src-line = • { $label }: людей { $users } · бронировали { $bookers } · броней { $bookings } · доехали { $completed }
+src-line = • { $label }: нажали «Старт» { $starts } · зарегистрировались { $users } · бронировали { $bookers } · броней { $bookings } · доехали { $completed }
 adm-late-trip-cancel =
     ⚠️ <b>Водитель отменил рейс с бронями в последний момент</b>
     { $driver }, { $phone }
