@@ -10,6 +10,8 @@ import { runMigrations } from '../src/db/migrate.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { clearImageCache } from '../src/services/photos.js';
+import { clearMaxFiles } from '../src/max/files.js';
+import { clearMaxIds } from '../src/max/ids.js';
 import { setStrictTexts } from '../src/i18n.js';
 import { setNow, setZone } from '../src/lib/time.js';
 
@@ -55,13 +57,27 @@ export class FakeTelegram {
       return new Response(new TextEncoder().encode(`jpeg:${path}`), { headers: { 'content-type': 'application/octet-stream' } });
     }
     const method = href.split('/').pop()!;
-    const payload = init?.body ? (JSON.parse(String(init.body)) as Record<string, any>) : {};
+    const payload = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, any>) : init?.body ? await this.multipart(init) : {};
     const result = this.handle(method, payload);
     const body = result === NOT_MODIFIED
       ? { ok: false, error_code: 400, description: 'Bad Request: message is not modified: specified new message content and reply markup are exactly the same' }
       : { ok: true, result };
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
+
+  /** Отправка файла (фото из MAX): grammY шлёт multipart. Достаём текстовые поля, файлы считаем. */
+  private async multipart(init: RequestInit): Promise<Record<string, any>> {
+    const raw = await new Response(init.body as ConstructorParameters<typeof Response>[0]).text();
+    const out: Record<string, any> = {};
+    for (const m of raw.matchAll(/name="([^"]+)"(;\s*filename=[^\r\n]*)?\r\n(?:[^\r\n]+\r\n)*\r\n([\s\S]*?)\r\n--/g)) {
+      out[m[1]!] = m[2] ? { file: m[3]!.length } : m[3];
+    }
+    this.uploadsTg.push(Object.keys(out).filter((k) => typeof out[k] === 'object').length);
+    return out;
+  }
+
+  /** Сколько файлов ушло в Telegram в каждой отправке с файлами. */
+  uploadsTg: number[] = [];
 
   private parseMarkup(rm: unknown): Pick<SentMessage, 'inline' | 'reply' | 'removedKeyboard'> {
     const m = typeof rm === 'string' ? JSON.parse(rm) : (rm ?? {});
@@ -301,8 +317,10 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
     can_connect_to_business: false,
     has_main_web_app: false,
   } as any;
-  initApp({ db, api: bot.api, adminIds: opts.adminIds ?? [ADMIN_ID], botUsername: 'baram_test_bot' });
+  initApp({ db, api: bot.api, adminIds: opts.adminIds ?? [ADMIN_ID], botUsername: 'baram_test_bot', max: undefined, maxBotUsername: undefined, miniappUrl: undefined });
   clearImageCache();
+  clearMaxIds();
+  clearMaxFiles();
   await seed();
   const h: Harness = {
     bot,

@@ -2,6 +2,7 @@ import type { Context } from 'grammy';
 import { Keyboard, type InlineKeyboard } from 'grammy';
 import { normalizePhone } from '../lib/format.js';
 import { t } from '../i18n.js';
+import { onMax } from './platform.js';
 import type { MyConversation } from './context.js';
 import {
   answerCb,
@@ -214,7 +215,7 @@ export class Wizard {
         if (!data.startsWith(PREFIX)) await this.conv.skip({ next: true });
         const key = data.slice(PREFIX.length);
         if (cq.message?.message_id !== msgId || !labels.has(key)) {
-          await this.ext(() => answerCb(cq.id, t('stale-button')));
+          await this.ext(() => answerCb(cq.id, t(onMax(this.chatId) ? 'stale-button-max' : 'stale-button')));
           await this.conv.skip();
         }
         await this.ext(() => answerCb(cq.id));

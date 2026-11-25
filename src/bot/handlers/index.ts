@@ -1,5 +1,6 @@
 import { Composer } from 'grammy';
 import { t } from '../../i18n.js';
+import { onMax } from '../platform.js';
 import type { MyContext } from '../context.js';
 import { listRoutes } from '../../services/board.js';
 import { parseStartLink, startPayloadOf } from '../../services/links.js';
@@ -16,7 +17,7 @@ import { requests, requestsList } from './requests.js';
 export const handlers = new Composer<MyContext>();
 
 handlers.command('id', async (ctx) => {
-  await send(ctx.chat.id, t('your-id', { id: String(ctx.from?.id ?? '') }));
+  await send(ctx.chat.id, t(onMax(ctx.chat.id) ? 'your-id-max' : 'your-id', { id: String(ctx.from?.id ?? '') }));
 });
 
 handlers.command('privacy', async (ctx) => {
@@ -86,9 +87,9 @@ handlers.use(driver, passenger, requests, board, admin);
 handlers.callbackQuery('noop', (ctx) => ctx.answerCallbackQuery());
 
 handlers.on('callback_query', async (ctx) => {
-  await answerCb(ctx.callbackQuery.id, t('stale-button'));
+  await answerCb(ctx.callbackQuery.id, t(onMax(ctx.chat?.id) ? 'stale-button-max' : 'stale-button'));
 });
 
 handlers.on('message', async (ctx) => {
-  await showMenu(ctx.user!, t('fallback'));
+  await showMenu(ctx.user!, t(onMax(ctx.chat.id) ? 'fallback-max' : 'fallback'));
 });

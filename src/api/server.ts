@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
@@ -25,6 +26,7 @@ import type { UserRow } from '../db/schema.js';
 import { normalizePhone, splitList } from '../lib/format.js';
 import { fromDayMinutes } from '../lib/time.js';
 import { log } from '../logger.js';
+import { parseMaxJson } from '../max/client.js';
 import { getBooking, listTripBookings, listUserBookings, type BookingView } from '../services/bookings.js';
 import { getLocality, listDirections, listLocalities, routeLabel } from '../services/directions.js';
 import { driverDirectionIds, getDriver } from '../services/drivers.js';
@@ -44,6 +46,8 @@ export interface ApiOptions {
   devTelegramId?: number;
   /** Папка с собранным Mini App (miniapp/dist). */
   staticDir?: string;
+  /** Вебхук бота в MAX: POST /max/webhook с секретом в заголовке. */
+  maxWebhook?: { secret: string; push: (update: any) => Promise<void> };
 }
 
 type Env = { Variables: { tgId: number; user: UserRow } };
@@ -134,6 +138,26 @@ export function createApi(opts: ApiOptions): Hono<Env> {
   });
 
   // Кто пришёл: проверяем подпись Telegram на каждом запросе. Кнопке в интерфейсе не доверяем.
+  // Вебхук MAX. Отвечаем сразу, а обрабатываем после: MAX ждёт ответа не дольше 30 секунд
+  // и при ошибке присылает то же обновление повторно.
+  const hook = opts.maxWebhook;
+  if (hook) {
+    api.post('/max/webhook', async (c) => {
+      const given = c.req.header('x-max-bot-api-secret') ?? '';
+      if (given.length !== hook.secret.length || !timingSafeEqual(Buffer.from(given), Buffer.from(hook.secret))) {
+        return c.json({ error: 'forbidden' }, 403);
+      }
+      let update: unknown = null;
+      try {
+        update = parseMaxJson(await c.req.text());
+      } catch {
+        return c.json({ error: 'bad_json' }, 400);
+      }
+      if (update && typeof update === 'object') void hook.push(update);
+      return c.json({ ok: true });
+    });
+  }
+
   api.use('/api/*', async (c, next) => {
     const header = c.req.header('authorization') ?? '';
     const tg = header.startsWith('tma ') ? verifyInitData(header.slice(4), opts.botToken) : null;
@@ -400,6 +424,6 @@ export function createApi(opts: ApiOptions): Hono<Env> {
 
 export function startApi(opts: ApiOptions & { port: number }): () => void {
   const server = serve({ fetch: createApi(opts).fetch, port: opts.port, hostname: '0.0.0.0' });
-  log.info({ port: opts.port }, 'Mini App: сервер запущен');
+  log.info({ port: opts.port }, 'HTTP-сервер запущен (Mini App, вебхук MAX)');
   return () => server.close();
 }

@@ -1,8 +1,9 @@
 import type { Api } from 'grammy';
 import type { Db } from './db/client.js';
+import type { MaxClient } from './max/client.js';
 
 /**
- * Общие зависимости приложения: база, Telegram API, список админов.
+ * Общие зависимости приложения: база, Telegram API, MAX, список админов.
  * Заполняется один раз при запуске (и в тестах — тестовыми заменами).
  */
 export interface App {
@@ -13,6 +14,10 @@ export interface App {
   botUsername?: string;
   /** Адрес Mini App, если она включена: кнопки «Открыть в приложении». */
   miniappUrl?: string;
+  /** Клиент MAX, если бот подключён и там (MAX_BOT_TOKEN). */
+  max?: MaxClient;
+  /** Имя бота в MAX — для ссылок max.ru/<имя>?start=… */
+  maxBotUsername?: string;
 }
 
 export const app = {} as App;

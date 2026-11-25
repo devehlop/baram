@@ -1,5 +1,4 @@
 import type { Context } from 'grammy';
-import { app } from '../../app.js';
 import type { Role } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { esc } from '../../lib/format.js';
@@ -8,6 +7,7 @@ import { parseStartLink, sourceOf } from '../../services/links.js';
 import { createUser, getUserByTg } from '../../services/users.js';
 import type { MyConversation } from '../context.js';
 import { sendTripLanding } from '../landing.js';
+import { appOn, onMax } from '../platform.js';
 import { showMenu } from '../ui/menu.js';
 import { column, Wizard } from '../wizard.js';
 import { runDriverForm } from './driverForm.js';
@@ -34,7 +34,7 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   // Первое сообщение: что это за сервис, где им пользоваться (чат или Mini App) и согласие на обработку данных —
   // до того, как спрашиваем имя и телефон.
   const consent = await w.ask({
-    text: introText(),
+    text: introText(chatId),
     rows: column([{ text: t('reg-consent-yes'), data: 'yes' }]),
     back: false,
     home: false,
@@ -66,11 +66,11 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
 
   // Телефон — только кнопкой: Telegram отдаёт номер, привязанный к аккаунту, его не подделать.
   const phoneAns = await w.ask({
-    text: t('reg-ask-phone', { name: esc(name) }),
+    text: t(onMax(chatId) ? 'reg-ask-phone-max' : 'reg-ask-phone', { name: esc(name) }),
     shareContactButton: t('reg-share-phone'),
     back: false,
     home: false,
-    hint: t('reg-phone-hint'),
+    hint: t(onMax(chatId) ? 'reg-phone-hint-max' : 'reg-phone-hint'),
   });
   if (phoneAns.kind !== 'contact') return;
 
@@ -89,16 +89,16 @@ export async function registration(conv: MyConversation, ctx: Context, startPayl
   await w.ext(async () => {
     const user = await getUserByTg(from.id);
     if (!user) return;
-    const appNote = app.miniappUrl ? `\n\n${t('reg-done-app')}` : '';
-    await showMenu(user, t('reg-done-passenger', { name: esc(userName) }) + appNote + (await channelNote()));
+    const appNote = appOn(chatId) ? `\n\n${t('reg-done-app')}` : '';
+    await showMenu(user, t(onMax(chatId) ? 'reg-done-passenger-max' : 'reg-done-passenger', { name: esc(userName) }) + appNote + (await channelNote()));
     const link = parseStartLink(startPayload);
     if (link?.kind === 'trip') await sendTripLanding(chatId, link.tripId, user.id);
   });
 }
 
-/** Приветствие перед согласием. Про приложение говорим, только если Mini App включена (MINIAPP_URL). */
-export function introText(): string {
-  return [t('reg-intro'), app.miniappUrl ? t('reg-intro-ways') : '', t('reg-intro-start'), t('reg-consent')]
+/** Приветствие перед согласием. Про приложение говорим, только если человек может его открыть. */
+export function introText(chatId: number): string {
+  return [t('reg-intro'), appOn(chatId) ? t('reg-intro-ways') : '', t('reg-intro-start'), t('reg-consent')]
     .filter(Boolean)
     .join('\n\n');
 }

@@ -1,5 +1,4 @@
 import { Composer } from 'grammy';
-import { app } from '../../app.js';
 import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone } from '../../lib/format.js';
 import { dayKey, fmtDayShort, fmtTime, now } from '../../lib/time.js';
@@ -12,6 +11,7 @@ import { getTrip } from '../../services/trips.js';
 import { cancelByPassenger, confirmRideAction, rateAction, submitBooking } from '../actions.js';
 import type { MyContext } from '../context.js';
 import { enter } from '../enter.js';
+import { appOn } from '../platform.js';
 import { kb, type Btn } from '../tg.js';
 import { bookingForPassenger, requestCard, starsRow, starsText, timeLabel } from '../ui/cards.js';
 import { num, show, toast } from './shared.js';
@@ -247,7 +247,7 @@ export async function help(ctx: MyContext): Promise<void> {
     ctx,
     [
       t('help-text', { hours: s.late_cancel_hours }),
-      app.miniappUrl ? t('help-app') : '',
+      appOn(ctx.chat!.id) ? t('help-app') : '',
       phone ? t('help-dispatcher', { phone: esc(phone) }) : '',
     ]
       .filter(Boolean)

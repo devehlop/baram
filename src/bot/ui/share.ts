@@ -43,7 +43,7 @@ export function shareText(trip: TripView, link: string, withPhone = false): stri
   return [...shareLines(trip, withPhone), `${t('share-book')} ${link}`].join('\n');
 }
 
-/** Ссылку «Поделиться» Telegram длиннее ~2000 символов не открывает, а кириллица в ней — по 6 знаков на букву. */
+/** Ссылку «Поделиться» длиннее ~2000 символов не открывают, а кириллица в ней — по 6 знаков на букву. */
 const MAX_SHARE_URL = 1900;
 /** Сколько строк с начала нельзя отбрасывать: маршрут, время, откуда забирает, места и цена. */
 const KEEP = 4;
@@ -53,9 +53,12 @@ const KEEP = 4;
  * ставит первой строкой). Длинный текст сокращается с конца; если и тогда не влезает —
  * список точек сбора заменяется на «список в боте».
  */
-export function shareUrl(trip: TripView, link: string, withPhone: boolean): string {
+export function shareUrl(trip: TripView, link: string, withPhone: boolean, max = false): string {
+  // В MAX у окна «Поделиться» только текст: ссылка идёт в нём последней строкой.
   const build = (lines: string[]) =>
-    `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent([...lines, t('share-cta')].join('\n'))}`;
+    max
+      ? `https://max.ru/:share?text=${encodeURIComponent([...lines, `${t('share-book')} ${link}`].join('\n'))}`
+      : `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent([...lines, t('share-cta')].join('\n'))}`;
   const lines = shareLines(trip, withPhone);
   const keep = KEEP + (withPhone ? 1 : 0);
   let url = build(lines);
@@ -70,11 +73,11 @@ export function shareUrl(trip: TripView, link: string, withPhone: boolean): stri
   return url;
 }
 
-/** Две кнопки окна «Поделиться»: с телефоном водителя и без. */
-export function shareRows(trip: TripView, link: string): Btn[][] {
+/** Две кнопки окна «Поделиться»: с телефоном водителя и без. max — окно «Поделиться» MAX. */
+export function shareRows(trip: TripView, link: string, max = false): Btn[][] {
   return [
-    [{ text: t('btn-share-phone'), url: shareUrl(trip, link, true) }],
-    [{ text: t('btn-share-nophone'), url: shareUrl(trip, link, false) }],
+    [{ text: t('btn-share-phone'), url: shareUrl(trip, link, true, max) }],
+    [{ text: t('btn-share-nophone'), url: shareUrl(trip, link, false, max) }],
   ];
 }
 

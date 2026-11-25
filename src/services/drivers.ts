@@ -12,6 +12,7 @@ import {
   type UserRow,
 } from '../db/schema.js';
 import { now } from '../lib/time.js';
+import { keepMaxPhotos } from '../max/files.js';
 
 export interface DriverFormInput {
   fullName: string;
@@ -105,6 +106,8 @@ export async function getDriver(userId: number): Promise<DriverView | undefined>
 
 /** Сохраняет анкету и отправляет её на проверку. Повторная анкета снова уходит админу. */
 export async function submitDriverForm(userId: number, input: DriverFormInput): Promise<void> {
+  // Фото из MAX сохраняем у себя сразу: ссылка на файл у MAX временная, а админ посмотрит позже.
+  await keepMaxPhotos(input.carPhotos);
   const values = { ...input, status: 'pending' as const, rejectReason: null, updatedAt: now() };
   await app.db
     .insert(drivers)
@@ -118,6 +121,7 @@ export async function submitDriverForm(userId: number, input: DriverFormInput): 
 }
 
 export async function updateCarPhotos(userId: number, photos: string[]): Promise<void> {
+  await keepMaxPhotos(photos);
   await app.db
     .update(drivers)
     .set({ carPhotos: photos, status: 'pending', rejectReason: null, updatedAt: now() })
