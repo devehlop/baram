@@ -57,6 +57,8 @@ describe('регистрация', () => {
       await v.contact('89171234568');
       expect(v.last()).toContain('Вот что где');
       expect(v.last()).toContain('есть в приложении');
+      await v.text('☎️ Помощь');
+      expect(v.last()).toContain('есть в приложении «Барам»');
     } finally {
       app.miniappUrl = undefined;
     }
