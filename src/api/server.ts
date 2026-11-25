@@ -27,6 +27,7 @@ import { normalizePhone, splitList } from '../lib/format.js';
 import { fromDayMinutes } from '../lib/time.js';
 import { log } from '../logger.js';
 import { parseMaxJson } from '../max/client.js';
+import { localIdOf } from '../max/ids.js';
 import { getBooking, listTripBookings, listUserBookings, type BookingView } from '../services/bookings.js';
 import { getLocality, listDirections, listLocalities, routeLabel } from '../services/directions.js';
 import { driverDirectionIds, getDriver } from '../services/drivers.js';
@@ -38,7 +39,7 @@ import { searchTrips } from '../services/search.js';
 import { loadSettings } from '../services/settings.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../services/trips.js';
 import { getUserByTg, setActiveRole } from '../services/users.js';
-import { verifyInitData } from './auth.js';
+import { verifyInitData, verifyMaxInitData } from './auth.js';
 
 export interface ApiOptions {
   botToken: string;
@@ -46,11 +47,14 @@ export interface ApiOptions {
   devTelegramId?: number;
   /** Папка с собранным Mini App (miniapp/dist). */
   staticDir?: string;
+  /** Токен бота в MAX: им MAX подписывает данные запуска Mini App. Пусто — вход из MAX выключен. */
+  maxBotToken?: string;
   /** Вебхук бота в MAX: POST /max/webhook с секретом в заголовке. */
   maxWebhook?: { secret: string; push: (update: any) => Promise<void> };
 }
 
-type Env = { Variables: { tgId: number; user: UserRow } };
+type Platform = 'tg' | 'max';
+type Env = { Variables: { tgId: number; user: UserRow; platform: Platform } };
 
 /** Рейс для пассажира до подтверждения брони: без госномера, телефона и реквизитов. Фото машины — только их число. */
 function publicTrip(t: TripView) {
@@ -137,7 +141,6 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     return c.json({ error: 'server_error' }, 500);
   });
 
-  // Кто пришёл: проверяем подпись Telegram на каждом запросе. Кнопке в интерфейсе не доверяем.
   // Вебхук MAX. Отвечаем сразу, а обрабатываем после: MAX ждёт ответа не дольше 30 секунд
   // и при ошибке присылает то же обновление повторно.
   const hook = opts.maxWebhook;
@@ -158,12 +161,25 @@ export function createApi(opts: ApiOptions): Hono<Env> {
     });
   }
 
+  // Кто пришёл: проверяем подпись на каждом запросе. Кнопке в интерфейсе не доверяем.
+  // «tma …» — Mini App в Telegram, «max …» — в MAX (подпись токеном бота в MAX).
   api.use('/api/*', async (c, next) => {
     const header = c.req.header('authorization') ?? '';
-    const tg = header.startsWith('tma ') ? verifyInitData(header.slice(4), opts.botToken) : null;
-    const tgId = tg?.id ?? opts.devTelegramId;
+    let tgId: number | undefined;
+    let platform: Platform = 'tg';
+    if (header.startsWith('tma ')) {
+      tgId = verifyInitData(header.slice(4), opts.botToken)?.id;
+    } else if (header.startsWith('max ') && opts.maxBotToken) {
+      const mu = verifyMaxInitData(header.slice(4), opts.maxBotToken);
+      if (mu) {
+        tgId = await localIdOf(mu.id);
+        platform = 'max';
+      }
+    }
+    tgId ??= opts.devTelegramId;
     if (!tgId) return c.json({ error: 'unauthorized' }, 401);
     c.set('tgId', tgId);
+    c.set('platform', platform);
     const user = await getUserByTg(tgId);
     if (user?.restriction === 'blocked') return c.json({ error: 'blocked' }, 403);
     if (!user && c.req.path !== '/api/me') return c.json({ error: 'not_registered' }, 403);
@@ -174,7 +190,9 @@ export function createApi(opts: ApiOptions): Hono<Env> {
   api.get('/api/me', async (c) => {
     const user = c.get('user') as UserRow | undefined;
     const s = await loadSettings();
-    const base = { botUsername: deps.botUsername ?? null, dispatcherPhone: s.dispatcher_phone || null };
+    // Ссылки «перейти в чат» ведут к боту в том мессенджере, откуда открыто приложение.
+    const botUsername = c.get('platform') === 'max' ? deps.maxBotUsername : deps.botUsername;
+    const base = { botUsername: botUsername ?? null, dispatcherPhone: s.dispatcher_phone || null };
     if (!user) return c.json({ registered: false, ...base });
     const d = await getDriver(user.id);
     return c.json({

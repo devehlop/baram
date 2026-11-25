@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
   await bot.init();
   const max = config.max ? new MaxClient({ token: config.max.token, apiRoot: config.max.apiRoot }) : undefined;
-  initApp({ db, api: bot.api, adminIds: config.adminIds, botUsername: bot.botInfo.username, miniappUrl: config.miniappUrl, max });
+  initApp({ db, api: bot.api, adminIds: config.adminIds, botUsername: bot.botInfo.username, miniappUrl: config.miniappUrl, max, maxMiniapp: config.max?.miniapp });
   const commands = [
     { command: 'start', description: t('cmd-start') },
     { command: 'find', description: t('cmd-find') },
@@ -52,6 +52,7 @@ async function main(): Promise<void> {
       port: config.port,
       staticDir,
       devTelegramId: config.miniappDevTelegramId,
+      maxBotToken: config.max?.token,
       maxWebhook: maxReceiver && webhookUrl ? { secret: maxReceiver.secret, push: (u) => maxReceiver.push(u) } : undefined,
     });
   }
