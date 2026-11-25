@@ -19,13 +19,20 @@ export async function noteVisit(telegramId: number, text?: string): Promise<void
     .onConflictDoUpdate({ target: visitors.telegramId, set: { lastSeenAt: at } });
 }
 
-/** Сколько человек впервые написали боту по каждой метке источника. since — с этой даты. */
+/**
+ * Сколько человек впервые написали боту по каждой метке источника. since — с этой даты.
+ * Зарегистрированных считаем по метке регистрации, как в sourceStats, остальных — по метке первого «Старта»:
+ * иначе человек, пришедший без метки и зарегистрировавшийся по ссылке друга, попал бы в «Старт» одной метки,
+ * а в регистрации — другой.
+ */
 export async function startsBySource(since?: Date): Promise<Map<string | null, number>> {
+  const source = sql<string | null>`case when ${users.id} is null then ${visitors.source} else ${users.source} end`;
   const rows = await app.db
-    .select({ source: visitors.source, n: sql<number>`count(*)::int` })
+    .select({ source, n: sql<number>`count(*)::int` })
     .from(visitors)
+    .leftJoin(users, eq(users.telegramId, visitors.telegramId))
     .where(since ? gte(visitors.firstSeenAt, since) : undefined)
-    .groupBy(visitors.source);
+    .groupBy(source);
   return new Map(rows.map((r) => [r.source, r.n]));
 }
 

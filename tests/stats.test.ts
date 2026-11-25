@@ -101,6 +101,21 @@ describe('статистика в админке', () => {
     expect(admin.last()).toContain('qr: нажали «Старт» 2 · зарегистрировались 0');
   });
 
+  it('«Старт» и регистрация одного человека считаются по одной метке', async () => {
+    const u = h.user(101);
+    await u.text('/start'); // пришёл без метки и ушёл
+    await u.text('/start s_aigul'); // вернулся по ссылке друга и зарегистрировался
+    await u.press('Согласен');
+    await u.press('Я пассажир');
+    await u.text('Айгуль');
+    await u.contact('+79170000002');
+    const admin = h.user(ADMIN_ID);
+    await admin.text('/admin');
+    await admin.press('📈 Откуда приходят');
+    expect(admin.last()).toContain('aigul: нажали «Старт» 1 · зарегистрировались 1');
+    expect(admin.last()).not.toContain('Без метки');
+  });
+
   it('не админ статистику не видит', async () => {
     const p = await passenger(h, 101, 'Айгуль', '+79170000002');
     await p.pressData('a:st:7');
