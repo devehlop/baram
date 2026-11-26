@@ -472,6 +472,9 @@ setting-trip_autoclose_hours = Закрыть рейс без «Доехали»
 setting-driver_late_cancel_hours = Поздняя отмена рейса водителем, часов
 setting-rating_min_count = Показывать рейтинг всем с, оценок
 setting-rating_alert_below = Сообщать админу, если рейтинг ниже
+setting-parcel_open_limit = Открытых посылок у человека, не больше
+setting-parcel_price_from = Подсказка цены посылки: от, ₽
+setting-parcel_price_to = Подсказка цены посылки: до, ₽
 setting-dispatcher_phone = Телефон диспетчера
 
 ## Дни и время
