@@ -9,6 +9,7 @@ import {
   type BookingView,
 } from '../../services/bookings.js';
 import { tripShareLink } from '../../services/links.js';
+import { listHeldParcels, listTripParcels } from '../../services/parcels.js';
 import { getTrip, lastTrip, listDriverTrips, type TripView } from '../../services/trips.js';
 import { passengerMarks, ratedBookings, ratingOf } from '../../services/ratings.js';
 import { setActiveRole } from '../../services/users.js';
@@ -33,6 +34,7 @@ import { onMax } from '../platform.js';
 import { kb, send, type Btn } from '../tg.js';
 import { bookingForDriver, driverCard, starsRow, starsText, tripCard } from '../ui/cards.js';
 import { canShare, shareRows, shareText } from '../ui/share.js';
+import { parcelButton } from './parcels.js';
 import { showMenu } from '../ui/menu.js';
 import { num, requireDriver, show, toast } from './shared.js';
 
@@ -113,10 +115,18 @@ function tripListLabel(trip: TripView): string {
 export async function driverTrips(ctx: MyContext): Promise<void> {
   if (!(await requireDriver(ctx))) return;
   const trips = await listDriverTrips(ctx.user!.id);
+  // Посылки из отменённых рейсов, которые всё ещё у водителя: их надо закрыть — «Передал» или «Вернул».
+  const held = await listHeldParcels(ctx.user!.id);
   await show(
     ctx,
-    trips.length ? t('drv-trips-title') : t('drv-trips-empty'),
-    kb([...trips.map((x) => [{ text: tripListLabel(x), data: `d:t:${x.id}` }]), [{ text: t('menu-post-trip'), data: 'd:post' }]]),
+    [trips.length || held.length ? t('drv-trips-title') : t('drv-trips-empty'), held.length ? t('drv-parcels-held', { n: held.length }) : '']
+      .filter(Boolean)
+      .join('\n\n'),
+    kb([
+      ...held.map((p) => [{ text: parcelButton(p, '📥 '), data: `d:pc:${p.id}` }]),
+      ...trips.map((x) => [{ text: tripListLabel(x), data: `d:t:${x.id}` }]),
+      [{ text: t('menu-post-trip'), data: 'd:post' }],
+    ]),
   );
 }
 driver.callbackQuery('d:trips', driverTrips);
@@ -138,6 +148,12 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   const list = await listTripBookings(tripId);
   const active = trip.status === 'published' || trip.status === 'departed';
   const rows: (Btn | false)[][] = list.map((b, i) => [{ text: passengerButton(b, i + 1), data: `d:b:${b.id}` }]);
+  // Посылки — под пассажирами: ✅ уже передана, 📥 у водителя.
+  const parcels = await listTripParcels(tripId);
+  for (const p of parcels) {
+    const mark = { taken: '', picked_up: '📥 ', delivered: '✅ ' }[p.status as string] ?? '';
+    rows.push([{ text: parcelButton(p, mark), data: `d:pc:${p.id}` }]);
+  }
   if (trip.status === 'published') {
     if (canShare(trip)) rows.push([{ text: t('btn-share-trip'), data: `d:sh:${trip.id}` }]);
     rows.push([{ text: t('btn-departed'), data: `d:go:${trip.id}` }]);
@@ -146,7 +162,12 @@ async function tripScreen(ctx: MyContext, tripId: number): Promise<void> {
   }
   if (trip.status === 'departed') rows.push([{ text: t('btn-arrived'), data: `d:done:${trip.id}` }]);
   rows.push([{ text: t('btn-to-my-trips'), data: 'd:trips' }]);
-  const header = list.length ? t('drv-trip-passengers') : active ? t('drv-trip-no-passengers') : '';
+  const header = [
+    list.length ? t('drv-trip-passengers') : active ? t('drv-trip-no-passengers') : '',
+    parcels.length ? t('drv-trip-parcels', { n: parcels.length }) : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
   await show(ctx, [tripCard(trip, { own: true }), header].filter(Boolean).join('\n\n'), kb(rows));
 }
 driver.callbackQuery(/^d:t:(\d+)$/, (ctx) => tripScreen(ctx, num(ctx)));

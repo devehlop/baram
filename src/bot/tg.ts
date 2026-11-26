@@ -203,6 +203,15 @@ export async function sendPhotos(chatId: number, fileIds: string[], caption?: st
  */
 const slots = new Map<string, number>();
 
+/** Забыть всё, что бот помнит о чатах: окна, квитанции, «живые» уведомления. Для тестов — каждый начинает с чистого чата. */
+export function clearChatMemory(): void {
+  lastInChat.clear();
+  lastBefore.clear();
+  screens.clear();
+  receipts.clear();
+  slots.clear();
+}
+
 /** Уведомление пользователю по его id в базе. slot — тема «живого» уведомления, см. выше. */
 export async function notifyUser(userId: number | null | undefined, text: string, markup?: Markup, slot?: string): Promise<void> {
   if (!userId) return;

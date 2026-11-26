@@ -43,6 +43,13 @@
       "when": 1795623090842,
       "tag": "0005_max",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795706791656,
+      "tag": "0006_parcels",
+      "breakpoints": true
     }
   ]
 }

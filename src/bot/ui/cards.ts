@@ -1,10 +1,11 @@
-import type { TimeKind } from '../../db/schema.js';
+import type { ParcelTimeKind } from '../../db/schema.js';
 import { t } from '../../i18n.js';
 import { esc, fmtPhone, fmtStars, money } from '../../lib/format.js';
 import { dayKey, fmtDateTime, fmtDayKey, fmtDayShort, fmtMinutes, fmtTime } from '../../lib/time.js';
 import type { BookingView, Place } from '../../services/bookings.js';
 import type { ComplaintView } from '../../services/complaints.js';
 import type { DriverView } from '../../services/drivers.js';
+import type { ParcelPlace, ParcelView } from '../../services/parcels.js';
 import type { RatingSummary } from '../../services/ratings.js';
 import type { RequestView } from '../../services/requests.js';
 import type { TripView } from '../../services/trips.js';
@@ -26,7 +27,7 @@ export function pickupLine(trip: Pick<TripView, 'pickupMode' | 'pickupPoints'>):
   return t(trip.pickupMode === 'points' ? 'trip-pickup-points' : 'trip-pickup-mixed', { points });
 }
 
-export function timeLabel(day: string, kind: TimeKind, exactMinutes: number | null): string {
+export function timeLabel(day: string, kind: ParcelTimeKind, exactMinutes: number | null): string {
   const when = kind === 'exact' ? t('time-at', { time: fmtMinutes(exactMinutes ?? 0) }) : t(`time-${kind}`);
   return `${fmtDayKey(day)}, ${when}`;
 }
@@ -186,6 +187,50 @@ export function requestCard(r: RequestView, o: { showPhone?: boolean } = {}): st
     `${t('label-baggage')}: ${baggageLine(r)}`,
     r.childSeat !== 'none' && `👶 ${t(`child-seat-${r.childSeat}`)}`,
     r.comment && `💬 ${esc(r.comment)}`,
+  ]);
+}
+
+/** Откуда или куда для посылки: адреса нет — значит, передают из рук в руки у водителя. */
+export function parcelPlaceLine(p: ParcelPlace, which: 'from' | 'to'): string {
+  const where = p.address ? esc(p.address) : t(which === 'from' ? 'parcel-from-self' : 'parcel-to-self');
+  return `${esc(p.city)}, ${where}${p.village ? ` · ${t('village-mark')}` : ''}`;
+}
+
+export function parcelPriceLine(p: Pick<ParcelView, 'price'>): string {
+  return p.price === null ? t('parcel-price-deal') : t('parcel-price-offer', { price: money(p.price) });
+}
+
+/**
+ * Посылка. Водителю до «Беру» — без телефонов: только что, откуда, куда и цена.
+ * contacts — телефоны отправителя и получателя (водителю после «Беру», отправителю — всегда).
+ */
+export function parcelCard(p: ParcelView, o: { contacts?: boolean; status?: boolean } = {}): string {
+  return lines([
+    `<b>📦 ${esc(p.route)}</b>`,
+    `🕔 ${timeLabel(p.day, p.timeKind, p.exactMinutes)}`,
+    `${t(`parcel-size-${p.size}`)}`,
+    `💬 ${esc(p.contents)}`,
+    p.valuable && `🔒 ${t('parcel-valuable-line')}`,
+    `${t('label-from')}: ${parcelPlaceLine(p.from, 'from')}`,
+    `${t('label-to')}: ${parcelPlaceLine(p.to, 'to')}`,
+    `💰 ${parcelPriceLine(p)}`,
+    o.contacts
+      ? `${t('parcel-sender')}: ${esc(p.sender.name)}, ${fmtPhone(p.sender.phone)}`
+      : `${t('parcel-sender')}: ${esc(p.sender.name)}`,
+    o.contacts && `${t('parcel-recipient')}: ${esc(p.recipientName)}, ${fmtPhone(p.recipientPhone)}`,
+    o.status && `${t('label-status')}: ${t(`parcel-status-${p.status}`)}`,
+  ]);
+}
+
+/** Посылка глазами отправителя: после «Беру» — водитель, машина, номер и телефон. */
+export function parcelForSender(p: ParcelView, trip?: TripView): string {
+  const d = trip?.driver;
+  return lines([
+    parcelCard(p, { contacts: true, status: true }),
+    d && `\n🚗 ${fmtDateTime(trip!.departsAt)}`,
+    d && `👤 ${t('label-driver')}: ${esc(d.name)}${d.badge ? ` · ${t('badge-verified')}` : ''}${d.rating ? ` · ${ratingLine(d.rating)}` : ''}`,
+    d && `🚘 ${carLine(d)} · <b>${esc(d.plate)}</b>`,
+    d && `📞 ${fmtPhone(d.phone)}`,
   ]);
 }
 

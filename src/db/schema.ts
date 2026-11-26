@@ -42,6 +42,17 @@ export type BookingStatus =
 export type CancelledBy = 'passenger' | 'driver' | 'admin';
 export type TimeKind = 'morning' | 'day' | 'evening' | 'exact';
 export type RequestStatus = 'open' | 'taken' | 'closed' | 'cancelled' | 'expired';
+/** Посылка: размер, когда удобно отправить (плюс «любое время») и где она сейчас. */
+export type ParcelSize = 'small' | 'medium' | 'large' | 'bulky';
+export type ParcelTimeKind = TimeKind | 'any';
+export type ParcelStatus =
+  | 'open' // ждёт водителя
+  | 'taken' // водитель взял в свой рейс
+  | 'picked_up' // посылка у водителя
+  | 'delivered' // передана получателю
+  | 'returned' // рейс отменён, водитель вернул посылку отправителю
+  | 'cancelled'
+  | 'expired'; // время прошло, никто не взял
 export type ComplaintKind = 'complaint' | 'wrong_person';
 export type ComplaintStatus = 'new' | 'in_progress' | 'resolved';
 /** Кого оценивают: водителя (оценивает пассажир) или пассажира (оценивает водитель). */
@@ -322,6 +333,62 @@ export const requests = pgTable(
 );
 
 /**
+ * Посылка: человек оставляет заявку, водитель направления берёт её в свой рейс.
+ * Цену отправитель предлагает сам или оставляет «договоримся» (price = null).
+ * Адрес пустой — посылку привезут водителю (откуда) или получатель заберёт сам (куда).
+ */
+export const parcels = pgTable(
+  'parcels',
+  {
+    id: serial('id').primaryKey(),
+    senderId: integer('sender_id')
+      .notNull()
+      .references(() => users.id),
+    directionId: integer('direction_id')
+      .notNull()
+      .references(() => directions.id),
+    fromSide: text('from_side').$type<Side>().notNull(),
+    day: text('day').notNull(), // YYYY-MM-DD в часовом поясе приложения
+    timeKind: text('time_kind').$type<ParcelTimeKind>().notNull(),
+    exactMinutes: integer('exact_minutes'),
+    windowFrom: ts('window_from').notNull(),
+    windowTo: ts('window_to').notNull(),
+    size: text('size').$type<ParcelSize>().notNull(),
+    contents: text('contents').notNull(),
+    /** Деньги, карты, ключи, документы или лекарства: видят и берут только водители со значком «Проверен». */
+    valuable: boolean('valuable').notNull().default(false),
+    fromLocalityId: integer('from_locality_id')
+      .notNull()
+      .references(() => localities.id),
+    fromAddress: text('from_address'),
+    fromLat: doublePrecision('from_lat'),
+    fromLon: doublePrecision('from_lon'),
+    toLocalityId: integer('to_locality_id')
+      .notNull()
+      .references(() => localities.id),
+    toAddress: text('to_address'),
+    toLat: doublePrecision('to_lat'),
+    toLon: doublePrecision('to_lon'),
+    recipientName: text('recipient_name').notNull(),
+    recipientPhone: text('recipient_phone').notNull(),
+    price: integer('price'),
+    status: text('status').$type<ParcelStatus>().notNull().default('open'),
+    driverId: integer('driver_id').references(() => users.id),
+    tripId: integer('trip_id').references(() => trips.id),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    takenAt: ts('taken_at'),
+    pickedUpAt: ts('picked_up_at'),
+    deliveredAt: ts('delivered_at'),
+    closedAt: ts('closed_at'),
+  },
+  (t) => [
+    index('parcels_open').on(t.status, t.directionId),
+    index('parcels_trip').on(t.tripId),
+    index('parcels_sender').on(t.senderId),
+  ],
+);
+
+/**
  * Оценка после поездки: 1–5 звёзд. Одна на бронь и сторону.
  * Пассажира оценивает водитель, оценка привязана к заказчику брони.
  */
@@ -433,6 +500,7 @@ export type LocalityRow = typeof localities.$inferSelect;
 export type TripRow = typeof trips.$inferSelect;
 export type BookingRow = typeof bookings.$inferSelect;
 export type RequestRow = typeof requests.$inferSelect;
+export type ParcelRow = typeof parcels.$inferSelect;
 export type ComplaintRow = typeof complaints.$inferSelect;
 export type RatingRow = typeof ratings.$inferSelect;
 export type SavedAddressRow = typeof savedAddresses.$inferSelect;

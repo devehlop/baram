@@ -12,6 +12,7 @@ import { seed } from '../src/db/seed.js';
 import { clearImageCache } from '../src/services/photos.js';
 import { clearMaxFiles } from '../src/max/files.js';
 import { clearMaxIds } from '../src/max/ids.js';
+import { clearChatMemory } from '../src/bot/tg.js';
 import { setStrictTexts } from '../src/i18n.js';
 import { setNow, setZone } from '../src/lib/time.js';
 
@@ -132,7 +133,8 @@ export class FakeTelegram {
         return { message_id: p.message_id, date, chat };
       }
       case 'deleteMessage': {
-        this.messages = this.messages.filter((m) => m.messageId !== p.message_id);
+        // Как в Telegram: номер сообщения ищется в своём чате, чужое с тем же номером не трогаем.
+        this.messages = this.messages.filter((m) => !(m.messageId === p.message_id && m.chatId === (chat.id || m.chatId)));
         return true;
       }
       case 'getFile':
@@ -321,6 +323,7 @@ export async function setup(opts: { adminIds?: number[]; now?: string } = {}): P
   clearImageCache();
   clearMaxIds();
   clearMaxFiles();
+  clearChatMemory();
   await seed();
   const h: Harness = {
     bot,

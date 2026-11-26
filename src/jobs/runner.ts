@@ -1,4 +1,4 @@
-import { completeTripAction, escalateRequest, expireRequestsAction } from '../bot/actions.js';
+import { completeTripAction, escalateRequest, expireParcelsAction, expireRequestsAction } from '../bot/actions.js';
 import { kb, notifyUser } from '../bot/tg.js';
 import { t } from '../i18n.js';
 import { esc, fmtPhone } from '../lib/format.js';
@@ -86,6 +86,13 @@ export async function runJobs(): Promise<void> {
     await expireRequestsAction();
   } catch (e) {
     log.error({ err: e }, 'Ошибка закрытия просроченных заявок');
+  }
+
+  // Посылку никто не взял, а время прошло — закрываем и сообщаем отправителю.
+  try {
+    await expireParcelsAction();
+  } catch (e) {
+    log.error({ err: e }, 'Ошибка закрытия просроченных посылок');
   }
 
   // Водитель забыл нажать «Доехали» — закрываем рейс сами.

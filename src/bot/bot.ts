@@ -9,6 +9,7 @@ import { noteVisit } from '../services/stats.js';
 import { getUserByTg } from '../services/users.js';
 import type { MyContext } from './context.js';
 import { driverForm, driverPhotos } from './conversations/driverForm.js';
+import { parcel } from './conversations/parcel.js';
 import { prompt } from './conversations/prompt.js';
 import { registration } from './conversations/registration.js';
 import { search } from './conversations/search.js';
@@ -70,6 +71,7 @@ export function createBot(token: string, client?: ApiClientOptions): Bot<MyConte
   pm.use(createConversation(driverPhotos, 'driverPhotos'));
   pm.use(createConversation(tripCreate, 'tripCreate'));
   pm.use(createConversation(search, 'search'));
+  pm.use(createConversation(parcel, 'parcel'));
   pm.use(createConversation(prompt, 'prompt'));
 
   pm.use(handlers);
