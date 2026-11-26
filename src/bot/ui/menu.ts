@@ -9,6 +9,7 @@ import { send } from '../tg.js';
 /** Подписи кнопок главного меню. Нажатие приходит боту обычным текстом. */
 export const MENU_KEYS = [
   'menu-find',
+  'menu-send-parcel',
   'menu-board',
   'menu-my-trips',
   'menu-help',
@@ -39,8 +40,9 @@ export async function mainKeyboard(user: UserRow): Promise<Keyboard> {
     k.text(t('menu-help')).text(t('menu-to-passenger'));
   } else {
     k.text(t('menu-find')).row();
-    k.text(t('menu-board')).text(t('menu-my-trips')).row();
-    k.text(t('menu-help')).text(t(driver ? 'menu-to-driver' : 'menu-become-driver'));
+    k.text(t('menu-send-parcel')).text(t('menu-my-trips')).row();
+    k.text(t('menu-board')).text(t('menu-help')).row();
+    k.text(t(driver ? 'menu-to-driver' : 'menu-become-driver'));
   }
   if (isAdminTg(user.telegramId)) k.row().text(t('menu-admin'));
   // В Telegram приложение открывается кнопкой слева от поля ввода, а в MAX такой нет — кнопка в меню.

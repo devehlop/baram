@@ -101,7 +101,7 @@ describe('MAX: регистрация', () => {
     expect(await getUserByTg(id)).toMatchObject({ name: 'Айгуль', phone: '+79171234567', activeRole: 'passenger' });
     expect(u.last()).toContain('кнопки под этим сообщением');
     expect(u.last()).not.toContain('есть в приложении');
-    expect(u.buttons()).toEqual(['🚗 Найти поездку', '📋 Доска', '🔁 Мои поездки', '☎️ Помощь', '🚘 Я водитель']);
+    expect(u.buttons()).toEqual(['🚗 Найти поездку', '📦 Посылка', '🔁 Мои поездки', '📋 Доска', '☎️ Помощь', '🚘 Я водитель']);
     // Сообщения человека бот в MAX удалить не может и не пытается.
     expect(mx.fake.calls.filter((c) => c === 'DELETE /messages').length).toBeLessThan(mx.fake.calls.filter((c) => c === 'POST /messages').length);
     app.miniappUrl = undefined;

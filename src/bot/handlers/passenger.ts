@@ -3,6 +3,7 @@ import { t } from '../../i18n.js';
 import { cut, esc, fmtPhone } from '../../lib/format.js';
 import { dayKey, fmtDayShort, fmtTime, now } from '../../lib/time.js';
 import { CANCELLABLE, getBooking, listUserBookings } from '../../services/bookings.js';
+import { listUserParcels } from '../../services/parcels.js';
 import { closeRequest, getRequest, listUserOpenRequests } from '../../services/requests.js';
 import { deleteAddress, deletePassenger, listAddresses, listPassengers, saveAddress } from '../../services/saved.js';
 import { getRating } from '../../services/ratings.js';
@@ -27,6 +28,7 @@ export async function findTrip(ctx: MyContext): Promise<void> {
 export async function myTrips(ctx: MyContext): Promise<void> {
   const { upcoming, past } = await listUserBookings(ctx.user!.id);
   const requests = await listUserOpenRequests(ctx.user!.id);
+  const parcels = await listUserParcels(ctx.user!.id);
   const rows: Btn[][] = [];
   const label = async (x: (typeof upcoming)[number]) => {
     const trip = await getTrip(x.booking.tripId);
@@ -35,9 +37,12 @@ export async function myTrips(ctx: MyContext): Promise<void> {
   };
   for (const x of upcoming) rows.push([{ text: `🟢 ${await label(x)}`, data: `p:b:${x.booking.id}` }]);
   for (const r of requests) rows.push([{ text: cut(`🔔 ${t('request-short')}: ${timeLabel(r.day, r.timeKind, r.exactMinutes)}`, 60), data: `p:rq:${r.id}` }]);
+  for (const p of parcels) {
+    rows.push([{ text: cut(`📦 ${timeLabel(p.day, p.timeKind, p.exactMinutes)} · ${t(`parcel-status-${p.status}`)}`, 60), data: `p:pc:${p.id}` }]);
+  }
   for (const x of past) rows.push([{ text: `▫️ ${await label(x)}`, data: `p:b:${x.booking.id}` }]);
-  rows.push([{ text: t('menu-find'), data: 'p:find' }]);
-  const empty = upcoming.length + past.length + requests.length === 0;
+  rows.push([{ text: t('menu-find'), data: 'p:find' }, { text: t('menu-send-parcel'), data: 'p:pcnew' }]);
+  const empty = upcoming.length + past.length + requests.length + parcels.length === 0;
   await show(ctx, t(empty ? 'my-trips-empty' : 'my-trips-title'), kb(rows));
 }
 passenger.callbackQuery('p:trips', myTrips);

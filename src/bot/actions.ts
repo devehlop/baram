@@ -4,7 +4,7 @@
  * поэтому правила и тексты уведомлений живут в одном месте.
  */
 import { t } from '../i18n.js';
-import { esc, fmtPhone, fmtStars } from '../lib/format.js';
+import { esc, fmtPhone, fmtStars, money } from '../lib/format.js';
 import { dayKey, fmtDateTime, fmtTime } from '../lib/time.js';
 import {
   acceptBooking,
@@ -38,13 +38,41 @@ import {
   type NewRequest,
   type RequestView,
 } from '../services/requests.js';
+import {
+  canCarry,
+  cancelParcel,
+  createParcel,
+  deliverParcel,
+  deliverTripParcels,
+  expireParcels,
+  getParcel,
+  listTripParcels,
+  pickUpParcel,
+  releaseParcel,
+  releaseTripParcels,
+  returnParcel,
+  takeParcel,
+  type NewParcel,
+  type ParcelView,
+} from '../services/parcels.js';
 import { getRating, passengerMarks, rateBooking, ratingOf, type RateResult, type RatingSummary } from '../services/ratings.js';
 import { loadSettings } from '../services/settings.js';
 import { cancelTrip, completeTrip, createTrip, getTrip, setTripDeparted, type TripInput, type TripView } from '../services/trips.js';
 import { getUser } from '../services/users.js';
 import { driverReviewKb } from './notify.js';
 import { kb, notifyAdmins, notifyUser, send, sendPhotos } from './tg.js';
-import { bookingForDriver, bookingForPassenger, carLine, complaintCard, driverCard, requestCard, starsRow, tripCard } from './ui/cards.js';
+import {
+  bookingForDriver,
+  bookingForPassenger,
+  carLine,
+  complaintCard,
+  driverCard,
+  parcelCard,
+  parcelForSender,
+  requestCard,
+  starsRow,
+  tripCard,
+} from './ui/cards.js';
 import { showMenu } from './ui/menu.js';
 import { app } from '../app.js';
 
@@ -94,6 +122,17 @@ export async function cancelTripAction(tripId: number, by: { driverId: number } 
     await tellRiders(b, t('trip-cancelled-for-passenger', { route: esc(trip.route), when: fmtDateTime(trip.departsAt) }));
   }
   if (by === 'admin') await notifyUser(trip.driverId, t('trip-cancelled-by-admin', { when: fmtDateTime(trip.departsAt) }));
+  await releaseParcelsOf(trip, 'parcel-released-trip-cancelled');
+  // Посылка уже у водителя, а рейс отменён. Отправителю — телефон водителя, водителю — кнопки,
+  // чтобы закрыть посылку: «Передал» или «Вернул отправителю». Она остаётся у него в «Моих рейсах».
+  for (const p of (await listTripParcels(tripId)).filter((x) => x.status === 'picked_up')) {
+    await notifyUser(p.sender.id, t('parcel-trip-cancelled-picked', { driver: esc(trip.driver.name), phone: fmtPhone(trip.driver.phone) }), parcelKbSender(p), parcelSlot(p));
+    await notifyUser(
+      trip.driverId,
+      t('drv-parcel-held-after-cancel', { name: esc(p.sender.name), phone: fmtPhone(p.sender.phone) }),
+      kb([[{ text: t('btn-open-parcel'), data: `d:pc:${p.id}` }]]),
+    );
+  }
   if (res.late) {
     await notifyAdmins(
       t('adm-late-trip-cancel', {
@@ -133,6 +172,10 @@ export async function completeTripAction(tripId: number, driverId: number | null
   if (!ids) return false;
   const trip = (await getTrip(tripId))!;
   await declineLeftovers(trip, leftovers);
+  for (const p of await deliverTripParcels(tripId)) {
+    await notifyUser(p.sender.id, t('parcel-delivered', { route: esc(p.route) }), parcelKbSender(p), parcelSlot(p));
+  }
+  await releaseParcelsOf(trip, 'parcel-released-not-picked');
   for (const b of await getBookings(ids)) {
     if (b.source === 'phone') continue;
     await notifyUser(
@@ -440,6 +483,112 @@ export async function expireRequestsAction(): Promise<void> {
   for (const r of await expireRequests()) {
     await notifyUser(r.user.id, t('req-expired'));
   }
+}
+
+// ——— Посылки ———
+
+const parcelSlot = (p: Pick<ParcelView, 'id'>) => `parcel:${p.id}`;
+
+function parcelKbSender(p: Pick<ParcelView, 'id'>) {
+  return kb([[{ text: t('btn-open-parcel'), data: `p:pc:${p.id}` }]]);
+}
+
+/** «Беру за 300 ₽», если цену предложил отправитель, иначе «Беру, цену обсудим». */
+export function takeParcelLabel(p: Pick<ParcelView, 'price'>): string {
+  return p.price === null ? t('btn-take-parcel-deal') : t('btn-take-parcel', { price: money(p.price) });
+}
+
+function parcelKbDriver(p: ParcelView) {
+  return kb([
+    [{ text: takeParcelLabel(p), data: `pc:take:${p.id}` }],
+    [{ text: t('btn-skip'), data: 'r:skip' }],
+  ]);
+}
+
+/** Водитель не забрал посылку (отказался, отменил или закрыл рейс): она снова видна водителям. */
+async function releaseParcelsOf(trip: TripView, key: string): Promise<void> {
+  const { released, expired } = await releaseTripParcels(trip.id);
+  for (const p of released) {
+    await notifyUser(p.sender.id, t(key, { when: fmtDateTime(trip.departsAt) }), parcelKbSender(p), parcelSlot(p));
+  }
+  // Время посылки уже прошло — одно сообщение «время прошло», без обещания других водителей.
+  for (const p of expired) await tellParcelExpired(p);
+}
+
+async function tellParcelExpired(p: ParcelView): Promise<void> {
+  await notifyUser(p.sender.id, t('parcel-expired'), kb([[{ text: t('btn-send-parcel-again'), data: 'p:pcnew' }]]), parcelSlot(p));
+}
+
+export async function submitParcel(input: NewParcel) {
+  const res = await createParcel(input);
+  if (!res.ok) return res;
+  const p = res.parcel;
+  for (const d of await activeDriversOfDirection(p.directionId)) {
+    if (d.userId === p.sender.id || !canCarry(p, d)) continue;
+    await send(d.telegramId, `${t('parcel-new-for-driver')}\n\n${parcelCard(p)}`, parcelKbDriver(p));
+  }
+  return res;
+}
+
+export async function takeParcelAction(parcelId: number, driverId: number, tripId: number) {
+  const res = await takeParcel(parcelId, driverId, tripId);
+  if (!res.ok) return res;
+  const trip = (await getTrip(tripId))!;
+  await notifyUser(
+    res.parcel.sender.id,
+    `${t(res.parcel.price === null ? 'parcel-taken-deal' : 'parcel-taken')}\n\n${parcelForSender(res.parcel, trip)}`,
+    parcelKbSender(res.parcel),
+    parcelSlot(res.parcel),
+  );
+  return res;
+}
+
+async function ownedParcel(parcelId: number, driverId: number) {
+  const p = await getParcel(parcelId);
+  const trip = p?.tripId ? await getTrip(p.tripId) : undefined;
+  return p && trip && p.driverId === driverId ? { p, trip } : null;
+}
+
+export async function pickUpParcelAction(parcelId: number, driverId: number): Promise<boolean> {
+  const x = await ownedParcel(parcelId, driverId);
+  if (!x || !(await pickUpParcel(parcelId, driverId))) return false;
+  await notifyUser(x.p.sender.id, t('parcel-picked-up', { driver: esc(x.trip.driver.name), phone: fmtPhone(x.trip.driver.phone) }), parcelKbSender(x.p), parcelSlot(x.p));
+  return true;
+}
+
+export async function deliverParcelAction(parcelId: number, driverId: number): Promise<boolean> {
+  const x = await ownedParcel(parcelId, driverId);
+  if (!x || !(await deliverParcel(parcelId, driverId))) return false;
+  await notifyUser(x.p.sender.id, t('parcel-delivered', { route: esc(x.p.route) }), parcelKbSender(x.p), parcelSlot(x.p));
+  return true;
+}
+
+export async function returnParcelAction(parcelId: number, driverId: number): Promise<boolean> {
+  const x = await ownedParcel(parcelId, driverId);
+  if (!x || !(await returnParcel(parcelId, driverId))) return false;
+  await notifyUser(x.p.sender.id, t('parcel-returned', { driver: esc(x.trip.driver.name), phone: fmtPhone(x.trip.driver.phone) }), parcelKbSender(x.p), parcelSlot(x.p));
+  return true;
+}
+
+export async function releaseParcelAction(parcelId: number, driverId: number): Promise<boolean> {
+  const x = await ownedParcel(parcelId, driverId);
+  if (!x || !(await releaseParcel(parcelId, driverId))) return false;
+  await notifyUser(x.p.sender.id, t('parcel-released-by-driver', { when: fmtDateTime(x.trip.departsAt) }), parcelKbSender(x.p), parcelSlot(x.p));
+  return true;
+}
+
+/** Отмена отправителем. Если водитель уже взял посылку — сообщаем ему. */
+export async function cancelParcelAction(parcelId: number, senderId: number): Promise<boolean> {
+  const res = await cancelParcel(parcelId, senderId);
+  if (!res) return false;
+  if (res.driverId) {
+    await notifyUser(res.driverId, t('drv-parcel-cancelled', { name: esc(res.parcel.sender.name), route: esc(res.parcel.route) }));
+  }
+  return true;
+}
+
+export async function expireParcelsAction(): Promise<void> {
+  for (const p of await expireParcels()) await tellParcelExpired(p);
 }
 
 // ——— Жалобы ———

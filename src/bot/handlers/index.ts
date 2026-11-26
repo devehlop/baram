@@ -11,6 +11,7 @@ import { menuKeyOf, showMenu, type MenuKey } from '../ui/menu.js';
 import { admin, adminMenu } from './admin.js';
 import { board, boardScreen } from './board.js';
 import { becomeDriver, driver, driverData, driverTrips, postTripMenu, toDriverMenu, toPassengerMenu } from './driver.js';
+import { parcels, sendParcel } from './parcels.js';
 import { findTrip, help, myTrips, passenger } from './passenger.js';
 import { requests, requestsList } from './requests.js';
 
@@ -59,10 +60,12 @@ handlers.command('help', help);
 handlers.command('find', findTrip);
 handlers.command('board', (ctx) => boardScreen(ctx));
 handlers.command('trips', myTrips);
+handlers.command('parcel', sendParcel);
 
 /** Большие кнопки главного меню приходят обычным текстом. */
 const MENU: Record<MenuKey, (ctx: MyContext) => Promise<void>> = {
   'menu-find': findTrip,
+  'menu-send-parcel': sendParcel,
   'menu-board': (ctx) => boardScreen(ctx),
   'menu-my-trips': myTrips,
   'menu-help': help,
@@ -82,7 +85,7 @@ handlers.on('message:text', async (ctx, next) => {
   await MENU[key](ctx);
 });
 
-handlers.use(driver, passenger, requests, board, admin);
+handlers.use(driver, passenger, parcels, requests, board, admin);
 
 handlers.callbackQuery('noop', (ctx) => ctx.answerCallbackQuery());
 
